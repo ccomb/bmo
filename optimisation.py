@@ -46,13 +46,13 @@ Fi = f(P, S, B, N, C, T)
 def D(x):
     p, s, b, n, c, t = x
     return sqrt(
-            (F-f(p, s, b, n, c, t))**2
-            + (P-p)**2
-            + (S-s)**2
-            + (B-b)**2
-            + (N-n)**2
-            + (C-c)**2
-            + (T-t)**2
+            ((F-f(p, s, b, n, c, t))/F)**2
+            + ((P-p)/P)**2
+            + ((S-s)/S)**2
+            + ((B-b)/B)**2
+            + ((N-n)/N)**2
+            + ((C-c)/C)**2
+            + ((T-t)/T)**2
             )
 
 # initial guess
