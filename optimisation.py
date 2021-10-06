@@ -1,8 +1,42 @@
 #!/usr/bin/env python3
 
 from math import sqrt
-import numpy as np
 from scipy.optimize import minimize
+from sympy import Eq, solve, symbols, lambdify, implemented_function
+import ast
+import numpy as np
+import sympy
+
+
+#formula = '218*t*p*f - (p+s)*(b*1.38+12*n)+c'
+
+def function_to_minimize(formula, objective):
+    """take :
+        - a function of N variables as a string,
+          representing a surface in N-1 dimensions in a space of dimension N
+          such as : '218*t*p*f - (p+s)*(b*1.38+12*n)+c'
+        - an objective the the function value should be equal to
+
+    returns a tuple (f, vars, initials) where
+        - f is a function representing the distance from an initial point to the surface
+        - vars is the list of variables of the function,
+        - initials is the list of variables representing the initial point
+    """
+    variables = list({node.id for node in ast.walk(ast.parse(formula)) if isinstance(node, ast.Name)})
+    initial_vars = ['initial_' + v for v in variables]
+    pivot = variables[0]
+    
+    if any(forbidden in variables for forbidden in dir() + ['symformula', 'objective', 'solution', 'pivot']):
+        raise Exception("forbidden variable")
+    
+    symformula = eval(formula, {v: symbols(v) for v in variables})
+    objective = 0
+    solution = solve(Eq(symformula, objective), symbols(pivot))[0]
+    distance = sympy.sqrt((symbols('initial_' + pivot)-solution)**2 + sum((symbols('initial_' + v) - symbols(v))**2 for v in variables))
+    allvars = variables + initial_vars
+    return lambdify(allvars, distance), variables, initial_vars
+
+
 
 # current situation
 P = 16  # NBPROD
@@ -62,7 +96,7 @@ Bi = 20000  # BRUT
 Ni = 290  # NDF
 Ci = 120000  # CHARF
 Ti = 600  # TJM
-x0 = np.array([Pi, Si, Bi, Ni, Ci, Ti])
+x0 = np.array([P, S, B, N, C, T])
 
 for method in methods:
     res = minimize(D, x0, method=method)
@@ -77,4 +111,3 @@ for method in methods:
     print('CHARF : %s' % Cx)
     print('TJM : %s' % Tx)
     print('%%FACT : %s' % Fx)
-
