@@ -1,33 +1,82 @@
 #!/usr/bin/env python3
 
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from math import sqrt
 from scipy.optimize import minimize
-from sympy import Eq, solve, symbols, lambdify, implemented_function
+from sympy import Eq, solve, symbols, lambdify
 import ast
 import numpy as np
 import sympy
 
 
+api = FastAPI()
+api.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+@api.get("/", response_class=HTMLResponse)
+async def standalone():
+    return FileResponse("index.html")
+
+
+@api.get("/optimize", response_class=JSONResponse)
+async def optimize(request: Request, formula: str = "", objective: float = 0.0):
+    params = request.query_params.keys()
+    if set(["formula", "objective"]) == set(params):
+        # we're just querying the variables
+        try:
+            f, variables, initial_vars = function_to_minimize(formula, objective)
+            return {"vars": variables, "initial": initial_vars}
+        except:
+            return {"status": "error", "error": "Invalid formula"}
+    else:
+        try:
+            initial_values = [
+                float(i[1])
+                for i in sorted(request.query_params.items())
+                if i[0].startswith("initial_")
+            ]
+            # we run the optimization
+            f, variables, initial_vars = function_to_minimize(
+                formula, objective, initial_values
+            )
+            x0 = np.array(initial_values)
+            minval = minimize(f, x0, method="Powell")
+            return {
+                "status": "success",
+                "result": {k: v for k, v in zip(initial_vars, minval.x)},
+            }
+        except:
+            return {"status": "error", "error": "Could not find an optimal solution"}
+
+
 # formula = '218*t*p*f - (p+s)*(b*1.38+12*n)+c'
 
 
-def function_to_minimize(formula, objective):
+def function_to_minimize(formula, objective, initial_values):
     """take :
-        - a function of N variables as a string,
-          representing a surface in N-1 dimensions in a space of dimension N
+        - a formula with N variables as a string,
+          representing a surface of dimension N-1 in a space of dimension N
           such as : '218*t*p*f - (p+s)*(b*1.38+12*n)+c'
         - an objective the the function value should be equal to
 
-    returns a tuple (f, vars, initials) where
+    returns a tuple (f, vars, initial_vars) where
         - f is a function representing the distance from an initial point to the surface
         - vars is the list of variables of the function,
-        - initials is the list of variables representing the initial point
+        - initial_vars is the list of variable names representing the initial point
     """
-    variables = list(
-        {node.id for node in ast.walk(ast.parse(formula)) if isinstance(node, ast.Name)}
+    variables = sorted(
+        list(
+            {
+                node.id
+                for node in ast.walk(ast.parse(formula))
+                if isinstance(node, ast.Name)
+            }
+        )
     )
     initial_vars = ["initial_" + v for v in variables]
-    pivot = variables[0]
+    pivot = variables[0]  # TODO try without explicit pivot
 
     if any(
         forbidden in variables
@@ -43,80 +92,13 @@ def function_to_minimize(formula, objective):
         + sum((symbols("initial_" + v) - symbols(v)) ** 2 for v in variables)
     )
     allvars = variables + initial_vars
-    return lambdify(allvars, distance), variables, initial_vars
 
+    f = lambdify(allvars, distance)
 
-# current situation
-P = 16  # NBPROD
-S = 7  # NBSUPP
-B = 39000  # BRUT
-N = 290  # NDF
-C = 120000  # CHARF
-T = 600  # TJM
-F = 0.45  # %FACT
+    def g(x):
+        kw = {z[0]: z[1] for z in zip(initial_vars, initial_values)}
+        for k, w in zip(variables, x):
+            kw[k] = w
+        return f(**kw)
 
-# optimization method
-methods = [
-    "Nelder-Mead",
-    "Powell",
-    "CG",
-    "BFGS",
-    #    'Newton-CG',
-    "L-BFGS-B",
-    "TNC",
-    "COBYLA",
-    "SLSQP",
-    "trust-constr",
-    #    'dogleg',
-    #    'trust-ncg',
-    #    'trust-exact',
-    #    'trust-krylov'
-]
-
-
-# value of F depending on other variables
-# (profitability formula)
-def f(p, s, b, n, c, t):
-    return ((p + s) * (b * 1.38 + 12 * n) + c) / (218 * t * p)
-
-
-# value of F to be profitable
-Fi = f(P, S, B, N, C, T)
-
-
-# function to minimize
-def D(x):
-    p, s, b, n, c, t = x
-    return sqrt(
-        ((F - f(p, s, b, n, c, t)) / F) ** 2
-        + ((P - p) / P) ** 2
-        + ((S - s) / S) ** 2
-        + ((B - b) / B) ** 2
-        + ((N - n) / N) ** 2
-        + ((C - c) / C) ** 2
-        + ((T - t) / T) ** 2
-    )
-
-
-# initial guess
-Pi = 10  # NBPROD
-Si = 0  # NBSUPP
-Bi = 20000  # BRUT
-Ni = 290  # NDF
-Ci = 120000  # CHARF
-Ti = 600  # TJM
-x0 = np.array([P, S, B, N, C, T])
-
-for method in methods:
-    res = minimize(D, x0, method=method)
-
-    Px, Sx, Bx, Nx, Cx, Tx = res.x
-    Fx = f(Px, Sx, Bx, Nx, Cx, Tx)
-    print("=== METHOD = %s ===" % method)
-    print("NBPROD : %s" % Px)
-    print("NBSUPP : %s" % Sx)
-    print("BRUT : %s" % Bx)
-    print("NDF : %s" % Nx)
-    print("CHARF : %s" % Cx)
-    print("TJM : %s" % Tx)
-    print("%%FACT : %s" % Fx)
+    return g, variables, initial_vars
