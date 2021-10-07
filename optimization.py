@@ -3,13 +3,11 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from math import sqrt
 from scipy.optimize import minimize
 from sympy import Eq, solve, symbols, lambdify
 import ast
 import numpy as np
 import sympy
-
 
 api = FastAPI()
 api.mount("/static", StaticFiles(directory="static"), name="static")
@@ -28,7 +26,7 @@ async def optimize(request: Request, formula: str = "", objective: float = 0.0):
         try:
             f, variables, initial_vars = function_to_minimize(formula, objective)
             return {"vars": variables, "initial": initial_vars}
-        except:
+        except Exception:
             return {"status": "error", "error": "Invalid formula"}
     else:
         try:
@@ -47,7 +45,7 @@ async def optimize(request: Request, formula: str = "", objective: float = 0.0):
                 "status": "success",
                 "result": {k: v for k, v in zip(initial_vars, minval.x)},
             }
-        except:
+        except Exception:
             return {"status": "error", "error": "Could not find an optimal solution"}
 
 
