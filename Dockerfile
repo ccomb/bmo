@@ -16,6 +16,7 @@ RUN set -x; \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY optimization.py /srv/
+COPY static /srv/
 
 EXPOSE 8000
 CMD ["uvicorn optimization:api"]
