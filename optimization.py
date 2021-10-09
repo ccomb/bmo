@@ -1,35 +1,39 @@
 #!/usr/bin/env python3
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from scipy.optimize import minimize
 from sympy import Eq, solve, symbols, lambdify
 import ast
 import numpy as np
+import os
 import sympy
 
 api = FastAPI()
 api.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory=".")
 
 
 @api.get("/", response_class=HTMLResponse)
-async def standalone():
-    return FileResponse("index.html")
+async def home(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "host": os.environ.get("HOST", "127.0.0.1")},
+    )
 
 
 @api.get("/optimize", response_class=JSONResponse)
-async def optimize(request: Request, formula: str = "", objective: float = 0.0):
+async def optimize(request: Request, formula: str = ""):
     try:
-        fdistance, fpivot, pivot, vars_wo_pivot = function_to_minimize(
-            formula, objective
-        )
+        fdistance, fpivot, pivot, vars_wo_pivot = function_to_minimize(formula)
     except Exception:
-        return {"status": "error", "error": "Invalid formula"}
+        return {"status": "Error : Invalid formula", "result": "null"}
 
-    # just query the formula
-    if not set(vars_wo_pivot).issubset(set(request.query_params.keys())):
-        return {"pivot": pivot, "vars": vars_wo_pivot}
+    # # just query the formula
+    # if not set(vars_wo_pivot).issubset(set(request.query_params.keys())):
+    #    return {"pivot": pivot, "vars": vars_wo_pivot}
 
     try:
         initialpoint_values = [
@@ -47,7 +51,7 @@ async def optimize(request: Request, formula: str = "", objective: float = 0.0):
         ]
         # compute the distance formula
         fdistance, fpivot, pivot, vars_wo_pivot = function_to_minimize(
-            formula, objective, initialpoint_values
+            formula, initialpoint_values
         )
         # find the shortest distance
         x0 = np.array(initialguess_values)  # without pivot value
@@ -61,18 +65,20 @@ async def optimize(request: Request, formula: str = "", objective: float = 0.0):
             },
         }
     except Exception:
-        return {"status": "error", "error": "Could not find an optimal solution"}
+        return {
+            "status": "Error : Could not find an optimal solution",
+            "result": "null",
+        }
 
 
-# formula = '218*t*p*f - (p+s)*(b*1.38+12*n)+c'
+# formula = '218*t*p*f - (p+s)*(b*1.38+12*n)+c = 0'
 
 
-def function_to_minimize(formula, objective, initialpoint_values=[]):
+def function_to_minimize(formula, initialpoint_values=[]):
     """take :
         - a formula with N variables as a string,
           representing a surface of dimension N-1 in a space of dimension N
-          such as : '218*t*p*f - (p+s)*(b*1.38+12*n)+c'
-        - an objective the the function value should be equal to
+          such as : '218*t*p*f - (p+s)*(b*1.38+12*n)+c=0'
         - an initial point
 
     returns a tuple (fdistance, fpivot, pivot, varsd where
@@ -82,23 +88,35 @@ def function_to_minimize(formula, objective, initialpoint_values=[]):
         - pivot is the variable extracted from the formula
         - vars is the list of variables of the function without the pivot
     """
-    variables = sorted(
+    left, right = formula.split("=")
+    leftvars = sorted(
         list(
             {
                 node.id
-                for node in ast.walk(ast.parse(formula))
+                for node in ast.walk(ast.parse(left))
                 if isinstance(node, ast.Name)
             }
         )
     )
+    rightvars = sorted(
+        list(
+            {
+                node.id
+                for node in ast.walk(ast.parse(right))
+                if isinstance(node, ast.Name)
+            }
+        )
+    )
+    variables = leftvars + rightvars
     initial_vars = ["initial_" + v for v in variables]
     pivot = variables[0]  # TODO try without explicit pivot
     vars_wo_pivot = [v for v in variables if v != pivot]
 
     # symbolic representation of the formula
-    symformula = eval(formula, {v: symbols(v) for v in variables})
+    symleft = eval(left, {v: symbols(v) for v in leftvars})
+    symright = eval(right, {v: symbols(v) for v in rightvars})
     # formula of the pivot depending on the other variables
-    sympivot = solve(Eq(symformula, objective), symbols(pivot))[0]
+    sympivot = solve(Eq(symleft, symright), symbols(pivot))[0]
     fpivot = lambdify(vars_wo_pivot, sympivot)
     symdistance = sympy.sqrt(
         (symbols("initial_" + pivot) - sympivot) ** 2
