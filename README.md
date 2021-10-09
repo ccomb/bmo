@@ -4,22 +4,21 @@ Find the nearest distance between a point and a curve in N dimensions, juste by 
 
 ## build
 
-./build.sh
-docker build -t bmo .
+`./build.sh`
+
+`docker build -t bmo .`
 
 ## run
 
-./run.sh
+`./run.sh`
 
-or
+or locally:
 
-locally:
-
-docker run bmo
+`docker run bmo`
 
 on a server:
 
-docker run -e HOST=<hostname>
+`docker run -e HOST=<hostname>`
 
 ## visit
 
