@@ -88,7 +88,7 @@ def function_to_minimize(formula, initialpoint_values=[]):
         - pivot is the variable extracted from the formula
         - vars is the list of variables of the function without the pivot
     """
-    left, right = formula.split("=")
+    left, right = [x.strip() for x in formula.split("=")]
     leftvars = sorted(
         list(
             {
