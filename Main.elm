@@ -1,9 +1,9 @@
-module Main exposing (fromFloat2, main)
+module Main exposing (main)
 
 import Browser exposing (element)
 import Char exposing (isAlpha)
 import Dict
-import Element exposing (Element, centerX, column, padding, paddingEach, px, rgb255, row, spacing, text, width)
+import Element exposing (Element, centerX, column, fill, maximum, padding, paddingEach, px, rgb255, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -33,17 +33,26 @@ type alias Point =
     List Variable
 
 
+type alias Host =
+    String
+
+
+type alias Formula =
+    Maybe String
+
+
 type alias Model =
-    { formula : Maybe String
-    , initialPoint : Point
+    { formula : Formula
+    , initialPoint : Maybe Point
     , nearestPoint : Maybe Point
-    , host : String
+    , host : Host
     }
 
 
 type Msg
     = FormulaChanged String
     | InitialValueChanged String String
+    | GotVariables (Result Http.Error Point)
     | GotResult (Result Http.Error Point)
 
 
@@ -61,7 +70,7 @@ defaultPlaceholder =
 init : String -> ( Model, Cmd Msg )
 init host =
     ( { formula = Nothing
-      , initialPoint = []
+      , initialPoint = Nothing
       , nearestPoint = Nothing
       , host = host
       }
@@ -86,43 +95,27 @@ subscriptions model =
 ------------
 
 
-extractVariables : String -> List Variable
-extractVariables formula =
-    formula
-        |> String.map
-            (\c ->
-                if isAlpha c then
-                    c
-
-                else
-                    ' '
-            )
-        |> String.words
-        |> Set.fromList
-        |> Set.remove ""
-        |> Set.toList
-        |> List.map (\w -> Variable w "")
-
-
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        FormulaChanged formula ->
+        FormulaChanged inputstring ->
             let
                 f =
-                    if String.length formula == 0 then
+                    if String.length inputstring == 0 then
                         Nothing
 
                     else
-                        Just formula
+                        Just inputstring
             in
-            ( { model | formula = f, initialPoint = extractVariables formula }, Cmd.none )
+            ( { model | formula = f }
+            , getVariables model.host inputstring
+            )
 
         InitialValueChanged name value ->
             let
                 newpoint =
-                    model.initialPoint
-                        |> List.map
+                    Maybe.map
+                        (List.map
                             (\variable ->
                                 case variable of
                                     Variable n v ->
@@ -132,6 +125,8 @@ update msg model =
                                         else
                                             variable
                             )
+                        )
+                        model.initialPoint
             in
             if isFilled newpoint then
                 ( { model | initialPoint = newpoint }
@@ -144,6 +139,14 @@ update msg model =
                 , Cmd.none
                 )
 
+        GotVariables result ->
+            case result of
+                Ok point ->
+                    ( { model | initialPoint = Just point }, Cmd.none )
+
+                Err error ->
+                    ( { model | initialPoint = Nothing }, Cmd.none )
+
         GotResult result ->
             case result of
                 Ok point ->
@@ -153,25 +156,51 @@ update msg model =
                     ( { model | nearestPoint = Nothing }, Cmd.none )
 
 
-isFilled : Point -> Bool
+isFilled : Maybe Point -> Bool
 isFilled point =
-    List.all
-        (\var ->
-            case var of
-                Variable n v ->
-                    if v == "" then
-                        False
+    case point of
+        Nothing ->
+            False
 
-                    else
-                        True
-        )
-        point
+        Just p ->
+            List.all
+                (\var ->
+                    case var of
+                        Variable n v ->
+                            if v == "" then
+                                False
+
+                            else
+                                True
+                )
+                p
 
 
 
-------------------
--- BACKEND COMM --
-------------------
+---------------------
+-- TALK TO BACKEND --
+---------------------
+
+
+urlBase : Host -> String
+urlBase host =
+    "http://" ++ host ++ ":8000"
+
+
+queryFormula : String -> String
+queryFormula inputstring =
+    Url.absolute [ "optimize" ] [ Url.string "formula" inputstring ]
+
+
+queryResult : Formula -> Maybe Point -> String
+queryResult inputstring point =
+    case point of
+        Nothing ->
+            Url.absolute [ "optimize" ] [ Url.string "formula" (Maybe.withDefault "" inputstring) ]
+
+        Just p ->
+            Url.absolute [ "optimize" ]
+                ([ Url.string "formula" (Maybe.withDefault "" inputstring) ] ++ List.map queryParam p)
 
 
 delay : Float -> msg -> Cmd msg
@@ -187,21 +216,20 @@ queryParam variable =
             Url.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "invalid")
 
 
+getVariables : Host -> String -> Cmd Msg
+getVariables host inputstring =
+    Http.get
+        { url = urlBase host ++ queryFormula inputstring
+        , expect = Http.expectJson GotVariables resultDecoder
+        }
+
+
 getResult : Model -> Cmd Msg
 getResult model =
     case model.formula of
         Just f ->
             Http.get
-                { url =
-                    "http://"
-                        ++ model.host
-                        ++ ":8000"
-                        ++ Url.absolute [ "optimize" ]
-                            ([ Url.string "formula" f
-                             ]
-                                ++ List.map queryParam
-                                    model.initialPoint
-                            )
+                { url = urlBase model.host ++ queryResult model.formula model.initialPoint
                 , expect = Http.expectJson GotResult resultDecoder
                 }
 
@@ -211,7 +239,7 @@ getResult model =
 
 pointDecoder : Decode.Decoder Point
 pointDecoder =
-    Decode.dict Decode.float |> Decode.andThen (\d -> Decode.succeed (Dict.toList d |> List.map (\var -> Variable (first var) (String.fromFloat <| second var))))
+    Decode.dict (Decode.maybe Decode.float) |> Decode.andThen (\dict -> Decode.succeed (Dict.toList dict |> List.map (\var -> Variable (first var) <| Maybe.withDefault "" <| Maybe.map String.fromFloat (second var))))
 
 
 resultDecoder : Decode.Decoder Point
@@ -242,7 +270,7 @@ view model =
         , paddingEach { top = 100, right = 0, bottom = 100, left = 0 }
         ]
     <|
-        column [ centerX, spacing 20 ] <|
+        column [ centerX, spacing 20, width <| maximum 700 fill ] <|
             [ inputFormula model
             , initialPoint model
             , nearestPoint model
@@ -255,9 +283,10 @@ inputFormula model =
         [ padding 50
         , Background.color (rgb255 70 70 70)
         , Border.rounded 15
+        , width fill
         ]
         [ Input.text
-            [ width (px 500)
+            [ width fill
             , Font.color (rgb255 50 50 50)
             , Input.focusedOnLoad
             ]
@@ -283,57 +312,23 @@ placeholder model =
             )
 
 
-hasEqualSign : Maybe String -> Bool
-hasEqualSign formula =
-    case formula of
-        Nothing ->
-            False
-
-        Just f ->
-            if String.contains "=" f then
-                True
-
-            else
-                False
-
-
 initialPoint : Model -> Element Msg
 initialPoint model =
-    if hasEqualSign model.formula then
-        column
-            [ Background.color (rgb255 70 70 70)
-            , spacing 20
-            , padding 50
-            , centerX
-            , Border.rounded 15
-            ]
-        <|
-            List.map (\v -> row [] [ inputValue v ]) model.initialPoint
+    column
+        [ Background.color (rgb255 70 70 70)
+        , spacing 20
+        , padding 50
+        , centerX
+        , width fill
+        , Border.rounded 15
+        ]
+    <|
+        case model.initialPoint of
+            Nothing ->
+                [ Element.text "Please write a valid formula to be able to fill in the initial values" ]
 
-    else
-        Element.none
-
-
-fromFloat2 : Float -> String
-fromFloat2 =
-    String.fromFloat
-        >> String.split "."
-        >> (\l ->
-                if List.length l == 1 then
-                    l ++ [ "" ]
-
-                else
-                    l
-           )
-        >> List.map
-            (\n ->
-                if n == "" then
-                    "0"
-
-                else
-                    n
-            )
-        >> String.join "."
+            Just point ->
+                List.map (\v -> row [] [ inputValue v ]) point
 
 
 inputValue : Variable -> Element Msg
@@ -360,29 +355,31 @@ displayValue var =
 
 nearestPoint : Model -> Element Msg
 nearestPoint model =
-    if hasEqualSign model.formula then
-        column
-            [ Background.color (rgb255 70 70 70)
-            , spacing 20
-            , padding 50
-            , centerX
-            , Border.rounded 15
-            ]
-        <|
-            case model.nearestPoint of
-                Just p ->
-                    [ Element.text "The nearest solution is" ]
-                        ++ List.map (\v -> row [] [ displayValue v ]) p
+    case model.initialPoint of
+        Nothing ->
+            Element.none
 
-                Nothing ->
-                    if model.formula == Nothing then
-                        []
+        Just initPoint ->
+            column
+                [ Background.color (rgb255 70 70 70)
+                , spacing 20
+                , padding 50
+                , centerX
+                , width fill
+                , Border.rounded 15
+                ]
+            <|
+                if isFilled (Just initPoint) then
+                    case model.nearestPoint of
+                        Just p ->
+                            [ Element.text "The nearest solution is" ]
+                                ++ List.map (\v -> row [] [ displayValue v ]) p
 
-                    else
-                        [ Element.text "Fill in the initial values to compute the nearest solution" ]
+                        Nothing ->
+                            [ Element.text "Could not compute the nearest point" ]
 
-    else
-        Element.none
+                else
+                    [ Element.text "Fill in the initial values to compute the nearest solution" ]
 
 
 

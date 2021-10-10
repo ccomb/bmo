@@ -29,11 +29,16 @@ async def optimize(request: Request, formula: str = ""):
     try:
         fdistance, fpivot, pivot, vars_wo_pivot = function_to_minimize(formula)
     except Exception:
-        return {"status": "Error : Invalid formula", "result": "null"}
+        return {"status": "Error : Invalid formula"}
 
-    # # just query the formula
-    # if not set(vars_wo_pivot).issubset(set(request.query_params.keys())):
-    #    return {"pivot": pivot, "vars": vars_wo_pivot}
+    # just query the formula
+    if len(set(request.query_params.keys())) < len(
+        set(["formula", pivot] + vars_wo_pivot)
+    ):
+        return {
+            "status": "success",
+            "result": {k: None for k in [pivot] + vars_wo_pivot},
+        }
 
     try:
         initialpoint_values = [
@@ -67,7 +72,6 @@ async def optimize(request: Request, formula: str = ""):
     except Exception:
         return {
             "status": "Error : Could not find an optimal solution",
-            "result": "null",
         }
 
 
