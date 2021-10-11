@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Browser exposing (element)
 import Char exposing (isAlpha)
+import Debouncer.Messages as Debouncer exposing (Debouncer, fromSeconds, provideInput, settleWhenQuietFor, toDebouncer)
 import Dict
 import Element exposing (Element, centerX, column, fill, maximum, padding, paddingEach, px, rgb255, row, spacing, text, width)
 import Element.Background as Background
@@ -9,12 +10,13 @@ import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
 import Html exposing (Html)
+import Html.Events exposing (onInput)
 import Http
 import Json.Decode as Decode
 import Process
 import Result
 import Set
-import Task exposing (perform)
+import Task
 import Tuple exposing (first, second)
 import Url.Builder as Url
 
@@ -46,6 +48,8 @@ type alias Model =
     , initialPoint : Maybe Point
     , nearestPoint : Maybe Point
     , host : Host
+    , debouncer : Debouncer Msg
+    , spinner : Bool
     }
 
 
@@ -54,6 +58,8 @@ type Msg
     | InitialValueChanged String String
     | GotVariables (Result Http.Error Point)
     | GotResult (Result Http.Error Point)
+    | Delay (Debouncer.Msg Msg)
+    | StopSpinner
 
 
 
@@ -64,7 +70,7 @@ type Msg
 
 defaultPlaceholder : String
 defaultPlaceholder =
-    "218*t*p*f - (p+s)*(b*1.38+12*n)+c = 0"
+    ""
 
 
 init : String -> ( Model, Cmd Msg )
@@ -73,6 +79,8 @@ init host =
       , initialPoint = Nothing
       , nearestPoint = Nothing
       , host = host
+      , debouncer = Debouncer.manual |> settleWhenQuietFor (Just <| fromSeconds 1.5) |> toDebouncer
+      , spinner = False
       }
     , Cmd.none
     )
@@ -95,6 +103,14 @@ subscriptions model =
 ------------
 
 
+updateDebouncer : Debouncer.UpdateConfig Msg Model
+updateDebouncer =
+    { mapMsg = Delay
+    , getDebouncer = .debouncer
+    , setDebouncer = \d model -> { model | debouncer = d }
+    }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -107,9 +123,13 @@ update msg model =
                     else
                         Just inputstring
             in
-            ( { model | formula = f }
-            , getVariables model.host inputstring
-            )
+            if f == Nothing then
+                ( { model | formula = Nothing, initialPoint = Nothing, nearestPoint = Nothing, spinner = False }, Cmd.none )
+
+            else
+                ( { model | formula = f, spinner = True }
+                , getVariables model inputstring
+                )
 
         InitialValueChanged name value ->
             let
@@ -142,18 +162,36 @@ update msg model =
         GotVariables result ->
             case result of
                 Ok point ->
-                    ( { model | initialPoint = Just point }, Cmd.none )
+                    ( { model | initialPoint = updatePoint point model.initialPoint, nearestPoint = Nothing }
+                    , getResult model
+                    )
 
                 Err error ->
-                    ( { model | initialPoint = Nothing }, Cmd.none )
+                    ( { model | nearestPoint = Nothing }
+                    , Task.perform (\_ -> StopSpinner) (Task.succeed "")
+                    )
 
         GotResult result ->
             case result of
                 Ok point ->
-                    ( { model | nearestPoint = Just point }, Cmd.none )
+                    ( { model | nearestPoint = Just point }
+                    , Task.perform (\_ -> StopSpinner) (Task.succeed "")
+                    )
 
                 Err error ->
-                    ( { model | nearestPoint = Nothing }, Cmd.none )
+                    ( { model | nearestPoint = Nothing }
+                    , Task.perform (\_ -> StopSpinner) (Task.succeed "")
+                    )
+
+        Delay subMsg ->
+            let
+                ( m, c ) =
+                    Debouncer.update update updateDebouncer subMsg model
+            in
+            ( { m | spinner = True }, c )
+
+        StopSpinner ->
+            ( { model | spinner = False }, Cmd.none )
 
 
 isFilled : Maybe Point -> Bool
@@ -167,13 +205,35 @@ isFilled point =
                 (\var ->
                     case var of
                         Variable n v ->
-                            if v == "" then
-                                False
-
-                            else
-                                True
+                            String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
                 )
                 p
+
+
+updatePoint : Point -> Maybe Point -> Maybe Point
+updatePoint newpoint point =
+    let
+        existingvalues =
+            point
+                |> Maybe.map
+                    (List.map
+                        (\var ->
+                            case var of
+                                Variable k v ->
+                                    ( k, v )
+                        )
+                    )
+                |> Maybe.withDefault []
+                |> Dict.fromList
+    in
+    newpoint
+        |> List.map
+            (\var ->
+                case var of
+                    Variable k v ->
+                        Variable k (Dict.get k existingvalues |> Maybe.withDefault "")
+            )
+        |> Just
 
 
 
@@ -203,12 +263,6 @@ queryResult inputstring point =
                 ([ Url.string "formula" (Maybe.withDefault "" inputstring) ] ++ List.map queryParam p)
 
 
-delay : Float -> msg -> Cmd msg
-delay time msg =
-    Process.sleep time
-        |> Task.perform (\_ -> msg)
-
-
 queryParam : Variable -> Url.QueryParameter
 queryParam variable =
     case variable of
@@ -216,11 +270,11 @@ queryParam variable =
             Url.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "invalid")
 
 
-getVariables : Host -> String -> Cmd Msg
-getVariables host inputstring =
+getVariables : Model -> String -> Cmd Msg
+getVariables model inputstring =
     Http.get
-        { url = urlBase host ++ queryFormula inputstring
-        , expect = Http.expectJson GotVariables resultDecoder
+        { url = urlBase model.host ++ queryFormula inputstring
+        , expect = Http.expectJson (GotVariables >> provideInput >> Delay) resultDecoder
         }
 
 
@@ -230,7 +284,7 @@ getResult model =
         Just f ->
             Http.get
                 { url = urlBase model.host ++ queryResult model.formula model.initialPoint
-                , expect = Http.expectJson GotResult resultDecoder
+                , expect = Http.expectJson (GotResult >> provideInput >> Delay) resultDecoder
                 }
 
         Nothing ->
@@ -275,6 +329,16 @@ view model =
             , initialPoint model
             , nearestPoint model
             ]
+
+
+spinnerView : Model -> Element Msg
+spinnerView model =
+    case model.spinner of
+        True ->
+            Element.image [] { src = "/static/spinner.png", description = "spinner" }
+
+        False ->
+            Element.none
 
 
 inputFormula : Model -> Element Msg
@@ -323,12 +387,16 @@ initialPoint model =
         , Border.rounded 15
         ]
     <|
-        case model.initialPoint of
-            Nothing ->
-                [ Element.text "Please write a valid formula to be able to fill in the initial values" ]
+        if model.spinner == True && not (isFilled model.initialPoint) then
+            [ Element.image [] { src = "/static/spinner.png", description = "spinner" } ]
 
-            Just point ->
-                List.map (\v -> row [] [ inputValue v ]) point
+        else
+            case model.initialPoint of
+                Nothing ->
+                    [ Element.text "Please write a valid formula to be able to fill in the initial values" ]
+
+                Just point ->
+                    List.map (\v -> row [] [ inputValue v ]) point
 
 
 inputValue : Variable -> Element Msg
@@ -370,13 +438,18 @@ nearestPoint model =
                 ]
             <|
                 if isFilled (Just initPoint) then
-                    case model.nearestPoint of
-                        Just p ->
-                            [ Element.text "The nearest solution is" ]
-                                ++ List.map (\v -> row [] [ displayValue v ]) p
+                    case model.spinner of
+                        False ->
+                            case model.nearestPoint of
+                                Just p ->
+                                    [ Element.text "The nearest solution is" ]
+                                        ++ List.map (\v -> row [] [ displayValue v ]) p
 
-                        Nothing ->
-                            [ Element.text "Could not compute the nearest point" ]
+                                Nothing ->
+                                    [ Element.image [] { src = "/static/spinner.png", description = "spinner" } ]
+
+                        True ->
+                            [ Element.image [] { src = "/static/spinner.png", description = "spinner" } ]
 
                 else
                     [ Element.text "Fill in the initial values to compute the nearest solution" ]
