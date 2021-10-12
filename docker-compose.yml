@@ -7,4 +7,9 @@ services:
       - "8000:8000"
     environment:
       HOST: "business-model-optimizer.com"
+    networks:
+      - caddy_default
 
+networks:
+  caddy_default:
+    external: true
