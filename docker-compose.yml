@@ -1,0 +1,10 @@
+version: '3.7'
+
+services:
+  ms:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      HOST: "business-model-optimizer.com"
+
