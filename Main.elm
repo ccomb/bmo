@@ -242,11 +242,6 @@ updatePoint newpoint point =
 ---------------------
 
 
-urlBase : Host -> String
-urlBase host =
-    "http://" ++ host ++ ":8000"
-
-
 queryFormula : String -> String
 queryFormula inputstring =
     Url.absolute [ "optimize" ] [ Url.string "formula" inputstring ]
@@ -273,7 +268,7 @@ queryParam variable =
 getVariables : Model -> String -> Cmd Msg
 getVariables model inputstring =
     Http.get
-        { url = urlBase model.host ++ queryFormula inputstring
+        { url = model.host ++ queryFormula inputstring
         , expect = Http.expectJson (GotVariables >> provideInput >> Delay) resultDecoder
         }
 
@@ -283,7 +278,7 @@ getResult model =
     case model.formula of
         Just f ->
             Http.get
-                { url = urlBase model.host ++ queryResult model.formula model.initialPoint
+                { url = model.host ++ queryResult model.formula model.initialPoint
                 , expect = Http.expectJson (GotResult >> provideInput >> Delay) resultDecoder
                 }
 

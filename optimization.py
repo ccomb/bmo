@@ -20,7 +20,7 @@ templates = Jinja2Templates(directory=".")
 async def home(request: Request):
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "host": os.environ.get("HOST", "127.0.0.1")},
+        {"request": request, "host": os.environ.get("HOST", "http://127.0.0.1:8000")},
     )
 
 
