@@ -4,7 +4,7 @@ import Browser exposing (element)
 import Char exposing (isAlpha)
 import Debouncer.Messages as Debouncer exposing (Debouncer, fromSeconds, provideInput, settleWhenQuietFor, toDebouncer)
 import Dict
-import Element exposing (Element, centerX, column, fill, maximum, padding, paddingEach, px, rgb255, row, spacing, text, width)
+import Element exposing (Element, centerX, column, el, fill, maximum, padding, paddingEach, px, rgb255, row, spacing, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -316,7 +316,7 @@ view model =
     Element.layout
         [ Background.color (rgb255 42 44 43)
         , Font.color (rgb255 217 203 158)
-        , paddingEach { top = 100, right = 0, bottom = 100, left = 0 }
+        , paddingEach { top = 10, right = 0, bottom = 100, left = 0 }
         ]
     <|
         column [ centerX, spacing 20, width <| maximum 700 fill ] <|
@@ -388,10 +388,17 @@ initialPoint model =
         else
             case model.initialPoint of
                 Nothing ->
-                    [ Element.text "Please write a valid formula to be able to fill in the initial values" ]
+                    [ Element.paragraph [] [ text "Please write a valid formula to be able to fill in the initial values" ] ]
 
                 Just point ->
-                    List.map (\v -> row [] [ inputValue v ]) point
+                    List.map (\v -> wrappedRow [ spacing 10 ] [ inputLabel v, inputValue v ]) point
+
+
+inputLabel : Variable -> Element Msg
+inputLabel var =
+    case var of
+        Variable name value ->
+            el [] (text name)
 
 
 inputValue : Variable -> Element Msg
@@ -399,13 +406,13 @@ inputValue var =
     case var of
         Variable name value ->
             Input.text
-                [ width (px 200)
+                [ width fill
                 , Font.color (rgb255 50 50 50)
                 ]
                 { onChange = InitialValueChanged name
                 , text = value
                 , placeholder = Nothing
-                , label = Input.labelLeft [ Font.size 30 ] (text <| name ++ " =")
+                , label = Input.labelHidden name
                 }
 
 
@@ -447,7 +454,7 @@ nearestPoint model =
                             [ Element.image [] { src = "/static/spinner.png", description = "spinner" } ]
 
                 else
-                    [ Element.text "Fill in the initial values to compute the nearest solution" ]
+                    [ Element.paragraph [] [ text "Fill in the initial values to compute the nearest solution" ] ]
 
 
 
