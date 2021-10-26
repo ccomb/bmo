@@ -123,9 +123,9 @@ def function_to_minimize(formula, initialpoint_values=[]):
     sympivot = solve(Eq(symleft, symright), symbols(pivot))[0]
     fpivot = lambdify(vars_wo_pivot, sympivot)
     symdistance = sympy.sqrt(
-        (((symbols("initial_" + pivot) - sympivot)) / sympivot) ** 2
+        (((symbols("initial_" + pivot) - sympivot)) / symbols("initial_" + pivot)) ** 2
         + sum(
-            ((symbols("initial_" + v) - symbols(v)) / symbols(v)) ** 2
+            ((symbols("initial_" + v) - symbols(v)) / symbols("initial_" + v)) ** 2
             for v in vars_wo_pivot
         )
     )
