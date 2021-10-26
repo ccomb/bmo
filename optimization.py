@@ -20,7 +20,7 @@ templates = Jinja2Templates(directory=".")
 async def home(request: Request):
     return templates.TemplateResponse(
         "index.html",
-        {"request": request, "host": os.environ.get("HOST", "http://127.0.0.1:8000")},
+        {"request": request, "host": os.environ.get("HOST", "http://localhost:8000")},
     )
 
 
@@ -123,8 +123,11 @@ def function_to_minimize(formula, initialpoint_values=[]):
     sympivot = solve(Eq(symleft, symright), symbols(pivot))[0]
     fpivot = lambdify(vars_wo_pivot, sympivot)
     symdistance = sympy.sqrt(
-        (symbols("initial_" + pivot) - sympivot) ** 2
-        + sum((symbols("initial_" + v) - symbols(v)) ** 2 for v in vars_wo_pivot)
+        (((symbols("initial_" + pivot) - sympivot)) / sympivot) ** 2
+        + sum(
+            ((symbols("initial_" + v) - symbols(v)) / symbols(v)) ** 2
+            for v in vars_wo_pivot
+        )
     )
 
     f = lambdify(vars_wo_pivot + initial_vars, symdistance)

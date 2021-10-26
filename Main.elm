@@ -303,7 +303,17 @@ getResult model =
 
 pointDecoder : Decode.Decoder Point
 pointDecoder =
-    Decode.dict (Decode.maybe Decode.float) |> Decode.andThen (\dict -> Decode.succeed (Dict.toList dict |> List.map (\var -> Variable (first var) <| Maybe.withDefault "" <| Maybe.map String.fromFloat (second var))))
+    Decode.dict (Decode.maybe Decode.float)
+        |> Decode.andThen
+            (\dict ->
+                Decode.succeed
+                    (Dict.toList dict
+                        |> List.map
+                            (\var ->
+                                Variable (first var) <| Maybe.withDefault "" <| Maybe.map String.fromFloat (second var)
+                            )
+                    )
+            )
 
 
 resultDecoder : Decode.Decoder Point
