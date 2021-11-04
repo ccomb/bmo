@@ -6,7 +6,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      HOST: "https://business-model-optimizer.com"
+      HOST: "https://app.business-model-optimizer.com"
     networks:
       - caddy_default
 
