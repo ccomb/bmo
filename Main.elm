@@ -1,6 +1,7 @@
 module Main exposing (main)
 
-import Browser exposing (element)
+import Browser exposing (Document, UrlRequest, application)
+import Browser.Navigation as Nav
 import Char exposing (isAlpha)
 import Debouncer.Messages as Debouncer exposing (Debouncer, fromSeconds, provideInput, settleWhenQuietFor, toDebouncer)
 import Dict
@@ -15,10 +16,14 @@ import Http
 import Json.Decode as Decode
 import Process
 import Result
+import Route exposing (Route, parseUrl)
 import Set
 import Task
 import Tuple exposing (first, second)
-import Url.Builder as Url
+import Url exposing (Url)
+import Url.Builder as UrlBuilder
+import Url.Parser exposing ((<?>), Parser, parse, query, string, top)
+import Url.Parser.Query as Query
 
 
 
@@ -51,6 +56,8 @@ type alias Model =
     , debouncer : Debouncer Msg
     , spinnerV : Bool
     , spinnerR : Bool
+    , navkey : Nav.Key
+    , route : Route
     }
 
 
@@ -62,6 +69,8 @@ type Msg
     | GetResult
     | GotResult (Result Http.Error Point)
     | Delay (Debouncer.Msg Msg)
+    | LinkClicked UrlRequest
+    | UrlChanged Url
 
 
 
@@ -75,29 +84,42 @@ defaultPlaceholder =
     ""
 
 
-init : String -> ( Model, Cmd Msg )
-init host =
-    ( { formula = Nothing
-      , initialPoint = Nothing
-      , nearestPoint = Nothing
-      , host = host
-      , debouncer = Debouncer.manual |> settleWhenQuietFor (Just <| fromSeconds 1.5) |> toDebouncer
-      , spinnerV = False
-      , spinnerR = False
-      }
-    , Cmd.none
+formulaParser : Parser (Formula -> a) a
+formulaParser =
+    query <| Query.string "formula"
+
+
+
+-- TODO : deduce host from url??
+
+
+init : Host -> Url -> Nav.Key -> ( Model, Cmd Msg )
+init host url key =
+    let
+        f =
+            Maybe.withDefault Nothing <| parse formulaParser url
+
+        model =
+            { formula = f
+            , initialPoint = Nothing
+            , nearestPoint = Nothing
+            , host = host
+            , debouncer = Debouncer.manual |> settleWhenQuietFor (Just <| fromSeconds 1.5) |> toDebouncer
+            , spinnerV =
+                if f /= Nothing then
+                    True
+
+                else
+                    False
+            , spinnerR = False
+            , route = parseUrl url
+            , navkey = key
+            }
+    in
+    ( model
+    , Task.perform ((\_ -> GetVariables) >> provideInput >> Delay)
+        (Task.succeed "")
     )
-
-
-
-------------------
--- SUBSCRIPTION --
-------------------
-
-
-subscriptions : Model -> Sub msg
-subscriptions model =
-    Sub.none
 
 
 
@@ -135,8 +157,9 @@ update msg model =
                     (Task.succeed "")
                 )
 
+        -- replaceUrl navkey url
         GetVariables ->
-            ( { model | spinnerV = True }, getVariables model )
+            ( { model | spinnerV = True }, Cmd.batch [ getVariables model, Nav.replaceUrl model.navkey <| buildUrl model ] )
 
         InitialValueChanged name value ->
             let
@@ -203,6 +226,19 @@ update msg model =
         Delay subMsg ->
             Debouncer.update update updateDebouncer subMsg model
 
+        UrlChanged url ->
+            ( { model | route = parseUrl url }
+            , Cmd.none
+            )
+
+        LinkClicked urlrequest ->
+            case urlrequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.navkey (Url.toString url) )
+
+                Browser.External href ->
+                    ( model, Nav.load href )
+
 
 isFilled : Maybe Point -> Bool
 isFilled point =
@@ -246,6 +282,15 @@ updatePoint newpoint point =
         |> Just
 
 
+buildUrl : Model -> String
+buildUrl model =
+    let
+        f =
+            model.formula |> Maybe.withDefault ""
+    in
+    UrlBuilder.absolute [] [ UrlBuilder.string "formula" f ]
+
+
 
 ---------------------
 -- TALK TO BACKEND --
@@ -254,25 +299,25 @@ updatePoint newpoint point =
 
 queryFormula : String -> String
 queryFormula inputstring =
-    Url.absolute [ "optimize" ] [ Url.string "formula" inputstring ]
+    UrlBuilder.absolute [ "optimize" ] [ UrlBuilder.string "formula" inputstring ]
 
 
 queryResult : Formula -> Maybe Point -> String
 queryResult inputstring point =
     case point of
         Nothing ->
-            Url.absolute [ "optimize" ] [ Url.string "formula" (Maybe.withDefault "" inputstring) ]
+            UrlBuilder.absolute [ "optimize" ] [ UrlBuilder.string "formula" (Maybe.withDefault "" inputstring) ]
 
         Just p ->
-            Url.absolute [ "optimize" ]
-                ([ Url.string "formula" (Maybe.withDefault "" inputstring) ] ++ List.map queryParam p)
+            UrlBuilder.absolute [ "optimize" ]
+                ([ UrlBuilder.string "formula" (Maybe.withDefault "" inputstring) ] ++ List.map queryParam p)
 
 
-queryParam : Variable -> Url.QueryParameter
+queryParam : Variable -> UrlBuilder.QueryParameter
 queryParam variable =
     case variable of
         Variable name value ->
-            Url.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "invalid")
+            UrlBuilder.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "invalid")
 
 
 getVariables : Model -> Cmd Msg
@@ -336,19 +381,23 @@ resultDecoder =
 -----------
 
 
-view : Model -> Html Msg
+view : Model -> Document Msg
 view model =
-    Element.layout
-        [ Background.color (rgb255 42 44 43)
-        , Font.color (rgb255 217 203 158)
-        , paddingEach { top = 10, right = 0, bottom = 100, left = 0 }
-        ]
-    <|
-        column [ centerX, spacing 20, width <| maximum 700 fill ] <|
-            [ inputFormula model
-            , initialPoint model
-            , nearestPoint model
+    { title = "BMO"
+    , body =
+        [ Element.layout
+            [ Background.color (rgb255 42 44 43)
+            , Font.color (rgb255 217 203 158)
+            , paddingEach { top = 10, right = 0, bottom = 100, left = 0 }
             ]
+          <|
+            column [ centerX, spacing 20, width <| maximum 700 fill ] <|
+                [ inputFormula model
+                , initialPoint model
+                , nearestPoint model
+                ]
+        ]
+    }
 
 
 inputFormula : Model -> Element Msg
@@ -475,6 +524,32 @@ nearestPoint model =
                     [ paragraph [] [ text "Fill in the initial values to compute the nearest solution" ] ]
 
 
+notfound : Model -> Element Msg
+notfound model =
+    el [] (text "Not Found")
+
+
+
+------------------------
+-- OTHER SIDE EFFECTS --
+------------------------
+
+
+subscriptions : Model -> Sub msg
+subscriptions model =
+    Sub.none
+
+
+onurlrequest : UrlRequest -> Msg
+onurlrequest =
+    LinkClicked
+
+
+onurlchange : Url -> Msg
+onurlchange =
+    UrlChanged
+
+
 
 ----------
 -- MAIN --
@@ -482,9 +557,11 @@ nearestPoint model =
 
 
 main =
-    Browser.element
+    Browser.application
         { init = init
         , view = view
         , update = update
         , subscriptions = subscriptions
+        , onUrlRequest = onurlrequest
+        , onUrlChange = onurlchange
         }

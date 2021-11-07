@@ -7,23 +7,13 @@ import Url.Parser.Query as Query
 
 type Route
     = NotFound
-    | ProcessTypes
-    | ProcessType String
-    | Processes (Maybe String)
-    | Process String
-    | CommitmentTypes
-    | EventTypes
+    | Optimizer
 
 
 routeParser : Parser (Route -> a) a
 routeParser =
     oneOf
-        [ map ProcessTypes (s "process-types")
-        , map ProcessType (s "process-type" </> string)
-        , map Processes (s "processes" <?> Query.string "type")
-        , map Process (s "process" </> string)
-        , map CommitmentTypes (s "commitment-types")
-        , map EventTypes (s "event-types")
+        [ map Optimizer top
         ]
 
 
