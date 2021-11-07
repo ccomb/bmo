@@ -16,14 +16,6 @@ api.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory=".")
 
 
-@api.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "host": os.environ.get("HOST", "http://localhost:8000")},
-    )
-
-
 @api.get("/optimize", response_class=JSONResponse)
 async def optimize(request: Request, formula: str = ""):
     try:
@@ -73,6 +65,15 @@ async def optimize(request: Request, formula: str = ""):
         return {
             "status": "Error : Could not find an optimal solution",
         }
+
+
+# Redirect everything else to the frontend
+@api.get("/{rest_of_path:path}", response_class=HTMLResponse)
+async def home(request: Request):
+    return templates.TemplateResponse(
+        "index.html",
+        {"request": request, "host": os.environ.get("HOST", "http://localhost:8000")},
+    )
 
 
 # formula = '218*t*p*f - (p+s)*(b*1.38+12*n)+c = 0'
