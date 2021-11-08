@@ -10,6 +10,7 @@ from scipy.optimize import minimize
 from sympy import Eq, solve, symbols, lambdify
 import ast
 import json
+import math
 import numpy as np
 import os
 import sympy
@@ -183,12 +184,16 @@ def store(formula, initial_point, closest_solution):
         "initial_point": initial_point,
         "closest_point": closest_solution,
     }
+    # trunk the sha1 depending on the number of record to keep short urls
+    hashtrunksize = 6 + len(
+        str(int(math.sqrt(CLIENT.bmo.optim.estimated_document_count())))
+    )
     doc["_id"] = sha1(
         (
             formula
             + json.dumps(initial_point, sort_keys=True)
             + json.dumps(closest_solution, sort_keys=True)
         ).encode("utf-8")
-    ).hexdigest()
+    ).hexdigest()[:hashtrunksize]
     CLIENT.bmo.optim.replace_one({"_id": doc["_id"]}, doc, upsert=True)
     return doc["_id"]
