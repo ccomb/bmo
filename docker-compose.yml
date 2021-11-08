@@ -5,11 +5,20 @@ services:
     build: .
     ports:
       - "8000:8000"
-    environment:
-      HOST: "https://app.business-model-optimizer.com"
-    networks:
-      - caddy_default
+    volumes:
+      - tmp:/tmp/
+      - mongodata:/data
+      - ./:/srv
 
-networks:
-  caddy_default:
-    external: true
+  mongo:
+    image: mongo:5
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    volumes:
+      - mongodata:/data/
+      - tmp:/tmp/
+
+volumes:
+  mongodata:
+  tmp:

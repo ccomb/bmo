@@ -1,0 +1,20 @@
+version: '3'
+
+services:
+  ms:
+    environment:
+      HOST: "https://app.business-model-optimizer.com"
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    networks:
+      - caddy_default
+    volumes:
+      - tmp:/tmp/
+      - mongodata:/data
+  mongo:
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+
+networks:
+  caddy_default:
+    external: true

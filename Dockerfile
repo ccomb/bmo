@@ -9,6 +9,7 @@ RUN set -x; \
     && apt-get install -y --no-install-recommends \
 	python3-aiofiles \
 	python3-jinja2 \
+	python3-pymongo \
 	python3-uvicorn \
 	uvicorn \
         python3-fastapi \

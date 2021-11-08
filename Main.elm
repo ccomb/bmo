@@ -5,7 +5,7 @@ import Browser.Navigation as Nav
 import Char exposing (isAlpha)
 import Debouncer.Messages as Debouncer exposing (Debouncer, fromSeconds, provideInput, settleWhenQuietFor, toDebouncer)
 import Dict
-import Element exposing (Element, centerX, column, el, fill, maximum, padding, paddingEach, paragraph, px, rgb255, row, spacing, text, width, wrappedRow)
+import Element exposing (Attribute, Element, centerX, column, el, fill, maximum, padding, paddingEach, paragraph, px, rgb255, row, spacing, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -45,32 +45,48 @@ type alias Host =
 
 
 type alias Formula =
-    Maybe String
+    String
 
 
 type alias Model =
     { formula : Formula
-    , initialPoint : Maybe Point
-    , nearestPoint : Maybe Point
+    , initialPoint : Point
+    , nearestPoint : Point
     , host : Host
     , debouncer : Debouncer Msg
     , spinnerV : Bool
     , spinnerR : Bool
     , navkey : Nav.Key
     , route : Route
+    , error : Maybe String
     }
 
 
 type Msg
     = FormulaChanged String
     | GetVariables
-    | GotVariables (Result Http.Error Point)
+    | GotVariables (Result Http.Error OptimizationResult)
     | InitialValueChanged String String
     | GetResult
-    | GotResult (Result Http.Error Point)
+    | GotResult (Result Http.Error OptimizationResult)
     | Delay (Debouncer.Msg Msg)
     | LinkClicked UrlRequest
     | UrlChanged Url
+
+
+type alias OptimizationResult =
+    { point : Point
+    , id : Maybe String
+    }
+
+
+type alias Flags =
+    { host : Host
+    , formula : Formula
+    , initialPoint : Point
+
+    --    , closest_solution : Point
+    }
 
 
 
@@ -84,36 +100,60 @@ defaultPlaceholder =
     ""
 
 
-formulaParser : Parser (Formula -> a) a
+formulaParser : Parser (Maybe Formula -> a) a
 formulaParser =
     query <| Query.string "formula"
+
+
+initialVariableParser : String -> Parser (Maybe String -> a) a
+initialVariableParser variable =
+    query <| Query.string variable
 
 
 
 -- TODO : deduce host from url??
 
 
-init : Host -> Url -> Nav.Key -> ( Model, Cmd Msg )
-init host url key =
+init : Decode.Value -> Url -> Nav.Key -> ( Model, Cmd Msg )
+init value url key =
     let
-        f =
-            Maybe.withDefault Nothing <| parse formulaParser url
+        formula =
+            parse formulaParser url |> Maybe.withDefault Nothing |> Maybe.withDefault ""
+
+        flags =
+            case Decode.decodeValue flagsDecoder value of
+                Ok f ->
+                    f
+
+                Err error ->
+                    { host = "plop", formula = "error=0", initialPoint = [] }
 
         model =
-            { formula = f
-            , initialPoint = Nothing
-            , nearestPoint = Nothing
-            , host = host
+            { formula =
+                if formula /= "" then
+                    formula
+
+                else
+                    flags.formula
+            , initialPoint = flags.initialPoint
+            , nearestPoint = []
+            , host = flags.host
             , debouncer = Debouncer.manual |> settleWhenQuietFor (Just <| fromSeconds 1.5) |> toDebouncer
             , spinnerV =
-                if f /= Nothing then
+                if formula /= "" then
                     True
 
                 else
                     False
-            , spinnerR = False
+            , spinnerR =
+                if isFilled flags.initialPoint then
+                    True
+
+                else
+                    False
             , route = parseUrl url
             , navkey = key
+            , error = Nothing
             }
     in
     ( model
@@ -140,41 +180,41 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         FormulaChanged inputstring ->
-            let
-                f =
-                    if String.length inputstring == 0 then
-                        Nothing
+            ( { model
+                | formula = inputstring
+                , spinnerV = True
+                , initialPoint =
+                    if inputstring == "" then
+                        []
 
                     else
-                        Just inputstring
-            in
-            if f == Nothing then
-                ( { model | formula = Nothing, initialPoint = Nothing, nearestPoint = Nothing, spinnerV = False }, Cmd.none )
+                        model.initialPoint
+                , nearestPoint =
+                    if inputstring == "" then
+                        []
 
-            else
-                ( { model | formula = f, spinnerV = True }
-                , Task.perform ((\_ -> GetVariables) >> provideInput >> Delay)
-                    (Task.succeed "")
-                )
+                    else
+                        model.nearestPoint
+              }
+            , Task.perform ((\_ -> GetVariables) >> provideInput >> Delay)
+                (Task.succeed "")
+            )
 
-        -- replaceUrl navkey url
         GetVariables ->
-            ( { model | spinnerV = True }, Cmd.batch [ getVariables model, Nav.replaceUrl model.navkey <| buildUrl model ] )
+            ( { model | spinnerV = True }, Cmd.batch [ getVariables model, Nav.replaceUrl model.navkey <| buildFormulaUrl model ] )
 
         InitialValueChanged name value ->
             let
                 newpoint =
-                    Maybe.map
-                        (List.map
-                            (\variable ->
-                                case variable of
-                                    Variable n v ->
-                                        if name == n then
-                                            Variable name value
+                    List.map
+                        (\variable ->
+                            case variable of
+                                Variable n v ->
+                                    if name == n then
+                                        Variable name value
 
-                                        else
-                                            variable
-                            )
+                                    else
+                                        variable
                         )
                         model.initialPoint
             in
@@ -184,18 +224,18 @@ update msg model =
                 )
 
             else
-                ( { model | initialPoint = newpoint, nearestPoint = Nothing }
+                ( { model | initialPoint = newpoint, nearestPoint = [] }
                 , Cmd.none
                 )
 
         GotVariables result ->
             case result of
-                Ok point ->
+                Ok optimresult ->
                     let
                         newpoint =
-                            updatePoint point model.initialPoint
+                            updatePoint optimresult.point model.initialPoint
                     in
-                    ( { model | initialPoint = newpoint, nearestPoint = Nothing, spinnerV = False }
+                    ( { model | initialPoint = newpoint, nearestPoint = [], spinnerV = False }
                     , if isFilled newpoint then
                         getResult model
 
@@ -204,22 +244,32 @@ update msg model =
                     )
 
                 Err error ->
-                    ( { model | nearestPoint = Nothing, spinnerV = False }
+                    ( { model
+                        | error =
+                            if model.formula /= "" then
+                                httpErrorToString error
+
+                            else
+                                Nothing
+                        , initialPoint = []
+                        , nearestPoint = []
+                        , spinnerV = False
+                      }
                     , Cmd.none
                     )
 
         GetResult ->
             ( { model | spinnerR = True }, getResult model )
 
-        GotResult result ->
-            case result of
-                Ok point ->
-                    ( { model | nearestPoint = Just point, spinnerR = False }
-                    , Cmd.none
+        GotResult optresult ->
+            case optresult of
+                Ok result ->
+                    ( { model | nearestPoint = result.point, spinnerR = False }
+                    , Nav.replaceUrl model.navkey <| buildIdUrl model result
                     )
 
                 Err error ->
-                    ( { model | nearestPoint = Nothing, spinnerR = False }
+                    ( { model | nearestPoint = [], spinnerR = False, error = httpErrorToString error }
                     , Cmd.none
                     )
 
@@ -240,36 +290,38 @@ update msg model =
                     ( model, Nav.load href )
 
 
-isFilled : Maybe Point -> Bool
+httpErrorToString : Http.Error -> Maybe String
+httpErrorToString error =
+    case error of
+        Http.BadBody err ->
+            err |> String.split "\n" |> List.reverse |> List.head
+
+        _ ->
+            Just "Other error"
+
+
+isFilled : Point -> Bool
 isFilled point =
-    case point of
-        Nothing ->
-            False
-
-        Just p ->
-            List.all
-                (\var ->
-                    case var of
-                        Variable n v ->
-                            String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
-                )
-                p
+    List.all
+        (\var ->
+            case var of
+                Variable n v ->
+                    String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
+        )
+        point
 
 
-updatePoint : Point -> Maybe Point -> Maybe Point
+updatePoint : Point -> Point -> Point
 updatePoint newpoint point =
     let
         existingvalues =
             point
-                |> Maybe.map
-                    (List.map
-                        (\var ->
-                            case var of
-                                Variable k v ->
-                                    ( k, v )
-                        )
+                |> List.map
+                    (\var ->
+                        case var of
+                            Variable k v ->
+                                ( k, v )
                     )
-                |> Maybe.withDefault []
                 |> Dict.fromList
     in
     newpoint
@@ -279,16 +331,16 @@ updatePoint newpoint point =
                     Variable k v ->
                         Variable k (Dict.get k existingvalues |> Maybe.withDefault "")
             )
-        |> Just
 
 
-buildUrl : Model -> String
-buildUrl model =
-    let
-        f =
-            model.formula |> Maybe.withDefault ""
-    in
-    UrlBuilder.absolute [] [ UrlBuilder.string "formula" f ]
+buildFormulaUrl : Model -> String
+buildFormulaUrl model =
+    UrlBuilder.absolute [] [ UrlBuilder.string "formula" model.formula ]
+
+
+buildIdUrl : Model -> OptimizationResult -> String
+buildIdUrl model result =
+    Maybe.withDefault (buildFormulaUrl model) result.id
 
 
 
@@ -302,15 +354,10 @@ queryFormula inputstring =
     UrlBuilder.absolute [ "optimize" ] [ UrlBuilder.string "formula" inputstring ]
 
 
-queryResult : Formula -> Maybe Point -> String
+queryResult : Formula -> Point -> String
 queryResult inputstring point =
-    case point of
-        Nothing ->
-            UrlBuilder.absolute [ "optimize" ] [ UrlBuilder.string "formula" (Maybe.withDefault "" inputstring) ]
-
-        Just p ->
-            UrlBuilder.absolute [ "optimize" ]
-                ([ UrlBuilder.string "formula" (Maybe.withDefault "" inputstring) ] ++ List.map queryParam p)
+    UrlBuilder.absolute [ "optimize" ]
+        ([ UrlBuilder.string "formula" inputstring ] ++ List.map queryParam point)
 
 
 queryParam : Variable -> UrlBuilder.QueryParameter
@@ -322,28 +369,18 @@ queryParam variable =
 
 getVariables : Model -> Cmd Msg
 getVariables model =
-    case model.formula of
-        Nothing ->
-            Cmd.none
-
-        Just f ->
-            Http.get
-                { url = model.host ++ queryFormula f
-                , expect = Http.expectJson GotVariables resultDecoder
-                }
+    Http.get
+        { url = model.host ++ queryFormula model.formula
+        , expect = Http.expectJson GotVariables resultDecoder
+        }
 
 
 getResult : Model -> Cmd Msg
 getResult model =
-    case model.formula of
-        Just f ->
-            Http.get
-                { url = model.host ++ queryResult model.formula model.initialPoint
-                , expect = Http.expectJson GotResult resultDecoder
-                }
-
-        Nothing ->
-            Cmd.none
+    Http.get
+        { url = model.host ++ queryResult model.formula model.initialPoint
+        , expect = Http.expectJson GotResult resultDecoder
+        }
 
 
 pointDecoder : Decode.Decoder Point
@@ -361,21 +398,31 @@ pointDecoder =
             )
 
 
-resultDecoder : Decode.Decoder Point
+resultDecoder : Decode.Decoder OptimizationResult
 resultDecoder =
     Decode.field "status" Decode.string
         |> Decode.andThen
             (\s ->
                 if s == "success" then
-                    Decode.field "result" pointDecoder
+                    Decode.map2 OptimizationResult
+                        (Decode.field "point" pointDecoder)
+                        (Decode.field "id" (Decode.maybe Decode.string))
 
                 else
-                    Decode.field "error"
-                        (Decode.fail "error")
+                    Decode.fail s
             )
 
 
+flagsDecoder : Decode.Decoder Flags
+flagsDecoder =
+    Decode.map3 Flags
+        (Decode.field "host" Decode.string)
+        (Decode.field "formula" Decode.string)
+        (Decode.field "initial_point" pointDecoder)
 
+
+
+--        (Decode.field "closest_solution" pointDecoder)
 -----------
 -- VIEWS --
 -----------
@@ -414,7 +461,7 @@ inputFormula model =
             , Input.focusedOnLoad
             ]
             { onChange = FormulaChanged
-            , text = Maybe.withDefault "" model.formula
+            , text = model.formula
             , placeholder = placeholder model
             , label = Input.labelAbove [ Font.size 30 ] (text "Enter your formula:")
             }
@@ -426,12 +473,11 @@ placeholder model =
     Just <|
         Input.placeholder []
             (text <|
-                case model.formula of
-                    Nothing ->
-                        defaultPlaceholder
+                if model.formula == "" then
+                    defaultPlaceholder
 
-                    Just f ->
-                        ""
+                else
+                    model.formula
             )
 
 
@@ -440,27 +486,28 @@ spinnerImage =
     Element.image [] { src = "/static/spinner.png", description = "spinner" }
 
 
+blockAttributes : List (Attribute Msg)
+blockAttributes =
+    [ Background.color (rgb255 70 70 70)
+    , spacing 20
+    , padding 50
+    , centerX
+    , width fill
+    , Border.rounded 15
+    ]
+
+
 initialPoint : Model -> Element Msg
 initialPoint model =
-    column
-        [ Background.color (rgb255 70 70 70)
-        , spacing 20
-        , padding 50
-        , centerX
-        , width fill
-        , Border.rounded 15
-        ]
-    <|
-        if model.spinnerV then
-            [ spinnerImage ]
+    if model.spinnerV then
+        column blockAttributes [ spinnerImage ]
 
-        else
-            case model.initialPoint of
-                Nothing ->
-                    [ paragraph [] [ text "Please write a valid formula to be able to fill in the initial values" ] ]
+    else if model.initialPoint /= [] then
+        column blockAttributes <|
+            List.map (\v -> wrappedRow [ spacing 10 ] [ inputLabel v, inputValue v ]) model.initialPoint
 
-                Just point ->
-                    List.map (\v -> wrappedRow [ spacing 10 ] [ inputLabel v, inputValue v ]) point
+    else
+        Element.none
 
 
 inputLabel : Variable -> Element Msg
@@ -494,39 +541,41 @@ displayValue var =
 
 nearestPoint : Model -> Element Msg
 nearestPoint model =
-    case model.initialPoint of
-        Nothing ->
-            Element.none
+    if model.spinnerR then
+        column blockAttributes [ spinnerImage ]
 
-        Just initPoint ->
-            column
-                [ Background.color (rgb255 70 70 70)
-                , spacing 20
-                , padding 50
-                , centerX
-                , width fill
-                , Border.rounded 15
-                ]
-            <|
-                if model.spinnerR then
-                    [ spinnerImage ]
+    else if model.initialPoint /= [] then
+        if not <| isFilled model.initialPoint then
+            column blockAttributes
+                [ paragraph [] [ text "Fill in the initial values to compute the nearest solution" ] ]
 
-                else if isFilled (Just initPoint) then
-                    case model.nearestPoint of
-                        Just p ->
-                            [ Element.text "The nearest solution is" ]
-                                ++ List.map (\v -> row [] [ displayValue v ]) p
+        else
+            column blockAttributes <|
+                [ Element.text "The nearest solution is" ]
+                    ++ List.map (\v -> row [] [ displayValue v ]) model.nearestPoint
 
-                        Nothing ->
-                            [ Element.none ]
-
-                else
-                    [ paragraph [] [ text "Fill in the initial values to compute the nearest solution" ] ]
+    else
+        Maybe.map (\err -> column blockAttributes [ viewError model ]) model.error |> Maybe.withDefault Element.none
 
 
 notfound : Model -> Element Msg
 notfound model =
     el [] (text "Not Found")
+
+
+viewError : Model -> Element Msg
+viewError model =
+    Maybe.map
+        (\t ->
+            Element.paragraph
+                [ Font.color (rgb255 255 0 0)
+                , Background.color (rgb255 255 255 255)
+                , padding 10
+                ]
+                [ Element.text t ]
+        )
+        model.error
+        |> Maybe.withDefault Element.none
 
 
 
