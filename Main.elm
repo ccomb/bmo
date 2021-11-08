@@ -300,11 +300,15 @@ httpErrorToString error =
 
 isFilled : Point -> Bool
 isFilled point =
-    List.all
-        (\(Variable n v) ->
-            String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
-        )
-        point
+    if List.length point == 0 then
+        False
+
+    else
+        List.all
+            (\(Variable n v) ->
+                String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
+            )
+            point
 
 
 updatePoint : Point -> Point -> Point
