@@ -207,14 +207,12 @@ update msg model =
             let
                 newpoint =
                     List.map
-                        (\variable ->
-                            case variable of
-                                Variable n v ->
-                                    if name == n then
-                                        Variable name value
+                        (\(Variable n v) ->
+                            if name == n then
+                                Variable name value
 
-                                    else
-                                        variable
+                            else
+                                Variable n v
                         )
                         model.initialPoint
             in
@@ -303,10 +301,8 @@ httpErrorToString error =
 isFilled : Point -> Bool
 isFilled point =
     List.all
-        (\var ->
-            case var of
-                Variable n v ->
-                    String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
+        (\(Variable n v) ->
+            String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
         )
         point
 
@@ -317,19 +313,15 @@ updatePoint newpoint point =
         existingvalues =
             point
                 |> List.map
-                    (\var ->
-                        case var of
-                            Variable k v ->
-                                ( k, v )
+                    (\(Variable k v) ->
+                        ( k, v )
                     )
                 |> Dict.fromList
     in
     newpoint
         |> List.map
-            (\var ->
-                case var of
-                    Variable k v ->
-                        Variable k (Dict.get k existingvalues |> Maybe.withDefault "")
+            (\(Variable k v) ->
+                Variable k (Dict.get k existingvalues |> Maybe.withDefault "")
             )
 
 
@@ -361,10 +353,8 @@ queryResult inputstring point =
 
 
 queryParam : Variable -> UrlBuilder.QueryParameter
-queryParam variable =
-    case variable of
-        Variable name value ->
-            UrlBuilder.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "invalid")
+queryParam (Variable name value) =
+    UrlBuilder.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "invalid")
 
 
 getVariables : Model -> Cmd Msg
@@ -511,32 +501,26 @@ initialPoint model =
 
 
 inputLabel : Variable -> Element Msg
-inputLabel var =
-    case var of
-        Variable name value ->
-            el [] (text name)
+inputLabel (Variable name value) =
+    el [] (text name)
 
 
 inputValue : Variable -> Element Msg
-inputValue var =
-    case var of
-        Variable name value ->
-            Input.text
-                [ width fill
-                , Font.color (rgb255 50 50 50)
-                ]
-                { onChange = InitialValueChanged name
-                , text = value
-                , placeholder = Nothing
-                , label = Input.labelHidden name
-                }
+inputValue (Variable name value) =
+    Input.text
+        [ width fill
+        , Font.color (rgb255 50 50 50)
+        ]
+        { onChange = InitialValueChanged name
+        , text = value
+        , placeholder = Nothing
+        , label = Input.labelHidden name
+        }
 
 
 displayValue : Variable -> Element Msg
-displayValue var =
-    case var of
-        Variable name value ->
-            Element.text (name ++ " = " ++ value)
+displayValue (Variable name value) =
+    Element.text (name ++ " = " ++ value)
 
 
 nearestPoint : Model -> Element Msg
