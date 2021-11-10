@@ -527,13 +527,11 @@ inputValue (Variable name value) =
 displayValue : Variable -> Element Msg
 displayValue (Variable name value) =
     text <|
-        name
-            ++ " = "
-            ++ (value
-                    |> String.toFloat
-                    |> Maybe.map String.fromFloat
-                    |> Maybe.withDefault "N/A"
-               )
+        (value
+            |> String.toFloat
+            |> Maybe.map String.fromFloat
+            |> Maybe.withDefault "N/A"
+        )
 
 
 variation : Variable -> Variable -> Element Msg
@@ -546,22 +544,30 @@ variation (Variable initial_name initial_value) (Variable target_name target_val
                         v =
                             (target - initial) / initial * 100 |> truncate
 
-                        sign =
+                        direction =
                             if v > 0 then
-                                "+"
+                                "Raise "
 
                             else
-                                ""
-                    in
-                    el
-                        [ Font.bold
-                        , if v >= 0 then
-                            Font.color (rgb255 0 200 0)
+                                "Lower "
 
-                          else
-                            Font.color (rgb255 200 0 0)
+                        colorize =
+                            \x ->
+                                if x >= 0 then
+                                    Font.color (rgb255 0 200 0)
+
+                                else
+                                    Font.color (rgb255 200 0 0)
+                    in
+                    paragraph
+                        []
+                        [ el
+                            [ colorize v ]
+                            (text direction)
+                        , el [ Font.bold ] (text target_name)
+                        , text " by "
+                        , el [ Font.bold, colorize v ] (text <| String.fromInt v ++ " %")
                         ]
-                        (text (sign ++ String.fromInt v ++ " %"))
 
                 Nothing ->
                     Element.none
@@ -593,9 +599,15 @@ nearestPoint model =
 
         else
             column blockAttributes <|
-                [ text "The nearest solution is:" ]
+                [ text "To achieve your goals you should:" ]
                     ++ List.map2
-                        (\iv tv -> row [] [ displayValue tv, text " (", variation iv tv, text ")" ])
+                        (\iv tv ->
+                            row []
+                                [ variation iv tv
+                                , text " to reach a value of "
+                                , displayValue tv
+                                ]
+                        )
                         model.initialPoint
                         model.nearestPoint
 
