@@ -5,7 +5,7 @@ import Browser.Navigation as Nav
 import Char exposing (isAlpha)
 import Debouncer.Messages as Debouncer exposing (Debouncer, fromSeconds, provideInput, settleWhenQuietFor, toDebouncer)
 import Dict
-import Element exposing (Attribute, Element, centerX, column, el, fill, maximum, padding, paddingEach, paragraph, px, rgb255, row, spacing, text, width, wrappedRow)
+import Element exposing (Attribute, Element, centerX, column, el, fill, maximum, padding, paddingEach, paddingXY, paragraph, px, rgb255, row, spacing, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -209,7 +209,7 @@ update msg model =
                     List.map
                         (\(Variable n v) ->
                             if name == n then
-                                Variable name value
+                                Variable n value
 
                             else
                                 Variable n v
@@ -311,7 +311,10 @@ isFilled point =
             point
 
 
-updatePoint : Point -> Point -> Point
+updatePoint :
+    Point
+    -> Point
+    -> Point -- copy values from point to newpoint
 updatePoint newpoint point =
     let
         existingvalues =
@@ -325,7 +328,8 @@ updatePoint newpoint point =
     newpoint
         |> List.map
             (\(Variable k v) ->
-                Variable k (Dict.get k existingvalues |> Maybe.withDefault "")
+                Variable k
+                    (Dict.get k existingvalues |> Maybe.withDefault "")
             )
 
 
@@ -358,7 +362,7 @@ queryResult inputstring point =
 
 queryParam : Variable -> UrlBuilder.QueryParameter
 queryParam (Variable name value) =
-    UrlBuilder.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "invalid")
+    UrlBuilder.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "")
 
 
 getVariables : Model -> Cmd Msg
@@ -385,9 +389,7 @@ pointDecoder =
                 Decode.succeed
                     (Dict.toList dict
                         |> List.map
-                            (\var ->
-                                Variable (first var) <| Maybe.withDefault "" <| Maybe.map String.fromFloat (second var)
-                            )
+                            (\( k, v ) -> Variable k (Maybe.withDefault "" <| Maybe.map String.fromFloat v))
                     )
             )
 
@@ -443,12 +445,7 @@ view model =
 
 inputFormula : Model -> Element Msg
 inputFormula model =
-    row
-        [ padding 50
-        , Background.color (rgb255 70 70 70)
-        , Border.rounded 15
-        , width fill
-        ]
+    row (blockAttributes ++ [ paddingEach { blockEdges | top = 50 } ])
         [ Input.text
             [ width fill
             , Font.color (rgb255 50 50 50)
@@ -480,11 +477,15 @@ spinnerImage =
     Element.image [] { src = "/static/spinner.png", description = "spinner" }
 
 
+blockEdges =
+    { top = 20, bottom = 50, left = 50, right = 50 }
+
+
 blockAttributes : List (Attribute Msg)
 blockAttributes =
     [ Background.color (rgb255 70 70 70)
     , spacing 20
-    , padding 50
+    , paddingEach blockEdges
     , centerX
     , width fill
     , Border.rounded 15
@@ -498,7 +499,8 @@ initialPoint model =
 
     else if model.initialPoint /= [] then
         column blockAttributes <|
-            List.map (\v -> wrappedRow [ spacing 10 ] [ inputLabel v, inputValue v ]) model.initialPoint
+            [ row [] [ text "Your current situation:" ] ]
+                ++ List.map (\v -> wrappedRow [ spacing 10 ] [ inputLabel v, inputValue v ]) model.initialPoint
 
     else
         Element.none
@@ -524,7 +526,59 @@ inputValue (Variable name value) =
 
 displayValue : Variable -> Element Msg
 displayValue (Variable name value) =
-    Element.text (name ++ " = " ++ value)
+    text <|
+        name
+            ++ " = "
+            ++ (value
+                    |> String.toFloat
+                    |> Maybe.map String.fromFloat
+                    |> Maybe.withDefault "N/A"
+               )
+
+
+variation : Variable -> Variable -> Element Msg
+variation (Variable initial_name initial_value) (Variable target_name target_value) =
+    case String.toFloat initial_value of
+        Just initial ->
+            case String.toFloat target_value of
+                Just target ->
+                    let
+                        v =
+                            (target - initial) / initial * 100 |> truncate
+
+                        sign =
+                            if v > 0 then
+                                "+"
+
+                            else
+                                ""
+                    in
+                    el
+                        [ Font.bold
+                        , if v >= 0 then
+                            Font.color (rgb255 0 200 0)
+
+                          else
+                            Font.color (rgb255 200 0 0)
+                        ]
+                        (text (sign ++ String.fromInt v ++ " %"))
+
+                Nothing ->
+                    Element.none
+
+        Nothing ->
+            Element.none
+
+
+approx : Float -> Float -> Float
+approx precision x =
+    -- precision = nb chiffres après la virgule
+    x |> (*) (10 ^ precision) |> truncate |> toFloat |> (*) (10 ^ -precision)
+
+
+neverFloat : Never -> Float
+neverFloat =
+    never
 
 
 nearestPoint : Model -> Element Msg
@@ -539,8 +593,11 @@ nearestPoint model =
 
         else
             column blockAttributes <|
-                [ Element.text "The nearest solution is" ]
-                    ++ List.map (\v -> row [] [ displayValue v ]) model.nearestPoint
+                [ text "The nearest solution is:" ]
+                    ++ List.map2
+                        (\iv tv -> row [] [ displayValue tv, text " (", variation iv tv, text ")" ])
+                        model.initialPoint
+                        model.nearestPoint
 
     else
         Maybe.map (\err -> column blockAttributes [ viewError model ]) model.error |> Maybe.withDefault Element.none
@@ -560,7 +617,7 @@ viewError model =
                 , Background.color (rgb255 255 255 255)
                 , padding 10
                 ]
-                [ Element.text t ]
+                [ text t ]
         )
         model.error
         |> Maybe.withDefault Element.none
