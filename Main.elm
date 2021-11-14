@@ -16,6 +16,7 @@ import Http
 import Json.Decode as Decode
 import Process
 import Result
+import Round
 import Route exposing (Route, parseUrl)
 import Set
 import Task
@@ -36,8 +37,16 @@ type Variable
     = Variable String String
 
 
+type Coef
+    = Coef String Float
+
+
 type alias Point =
     List Variable
+
+
+type alias Coefs =
+    List Coef
 
 
 type alias Host =
@@ -51,6 +60,7 @@ type alias Formula =
 type alias Model =
     { formula : Formula
     , initialPoint : Point
+    , coefs : Coefs
     , nearestPoint : Point
     , host : Host
     , debouncer : Debouncer Msg
@@ -67,6 +77,7 @@ type Msg
     | GetVariables
     | GotVariables (Result Http.Error OptimizationResult)
     | InitialValueChanged String String
+    | CoefChanged String Float
     | GetResult
     | GotResult (Result Http.Error OptimizationResult)
     | Delay (Debouncer.Msg Msg)
@@ -84,6 +95,7 @@ type alias Flags =
     { host : Host
     , formula : Formula
     , initialPoint : Point
+    , coefs : Coefs
 
     --    , closest_solution : Point
     }
@@ -126,7 +138,7 @@ init value url key =
                     f
 
                 Err error ->
-                    { host = "plop", formula = "error=0", initialPoint = [] }
+                    { host = "", formula = "", initialPoint = [], coefs = [] }
 
         model =
             { formula =
@@ -136,6 +148,7 @@ init value url key =
                 else
                     flags.formula
             , initialPoint = flags.initialPoint
+            , coefs = flags.coefs
             , nearestPoint = []
             , host = flags.host
             , debouncer = Debouncer.manual |> settleWhenQuietFor (Just <| fromSeconds 1.5) |> toDebouncer
@@ -215,14 +228,32 @@ update msg model =
                                 Variable n v
                         )
                         model.initialPoint
+
+                newcoefs =
+                    if
+                        List.foldl
+                            (\(Coef n v) b ->
+                                if name == n then
+                                    True
+
+                                else
+                                    b
+                            )
+                            False
+                            model.coefs
+                    then
+                        model.coefs
+
+                    else
+                        Coef name 1.0 :: model.coefs
             in
             if isFilled newpoint then
-                ( { model | initialPoint = newpoint, spinnerR = True }
+                ( { model | initialPoint = newpoint, coefs = newcoefs, spinnerR = True }
                 , Task.perform ((\_ -> GetResult) >> provideInput >> Delay) (Task.succeed "")
                 )
 
             else
-                ( { model | initialPoint = newpoint, nearestPoint = [] }
+                ( { model | initialPoint = newpoint, coefs = newcoefs, nearestPoint = [] }
                 , Cmd.none
                 )
 
@@ -286,6 +317,29 @@ update msg model =
 
                 Browser.External href ->
                     ( model, Nav.load href )
+
+        CoefChanged name coef ->
+            let
+                newcoefs =
+                    List.map
+                        (\(Coef n v) ->
+                            if name == n then
+                                Coef n coef
+
+                            else
+                                Coef n v
+                        )
+                        model.coefs
+            in
+            if isFilled model.initialPoint then
+                ( { model | coefs = newcoefs, spinnerR = True }
+                , Task.perform ((\_ -> GetResult) >> provideInput >> Delay) (Task.succeed "")
+                )
+
+            else
+                ( { model | coefs = newcoefs, nearestPoint = [] }
+                , Cmd.none
+                )
 
 
 httpErrorToString : Http.Error -> Maybe String
@@ -394,6 +448,19 @@ pointDecoder =
             )
 
 
+coefsDecoder : Decode.Decoder Coefs
+coefsDecoder =
+    Decode.dict (Decode.maybe Decode.float)
+        |> Decode.andThen
+            (\dict ->
+                Decode.succeed
+                    (Dict.toList dict
+                        |> List.map
+                            (\( k, v ) -> Coef k (Maybe.withDefault 1.0 v))
+                    )
+            )
+
+
 resultDecoder : Decode.Decoder OptimizationResult
 resultDecoder =
     Decode.field "status" Decode.string
@@ -411,10 +478,11 @@ resultDecoder =
 
 flagsDecoder : Decode.Decoder Flags
 flagsDecoder =
-    Decode.map3 Flags
+    Decode.map4 Flags
         (Decode.field "host" Decode.string)
         (Decode.field "formula" Decode.string)
         (Decode.field "initial_point" pointDecoder)
+        (Decode.field "coefs" coefsDecoder)
 
 
 
@@ -498,9 +566,27 @@ initialPoint model =
         column blockAttributes [ spinnerImage ]
 
     else if model.initialPoint /= [] then
+        let
+            newCoefs =
+                Dict.union
+                    (model.coefs |> List.map (\(Coef n v) -> ( n, v )) |> Dict.fromList)
+                    (model.initialPoint |> List.map (\(Variable n v) -> ( n, 1.0 )) |> Dict.fromList)
+                    |> Dict.toList
+                    |> List.map (\( n, v ) -> Coef n v)
+        in
         column blockAttributes <|
             [ row [] [ text "Your current situation:" ] ]
-                ++ List.map (\v -> wrappedRow [ spacing 10 ] [ inputLabel v, inputValue v ]) model.initialPoint
+                ++ List.map2
+                    (\v (Coef n c) ->
+                        wrappedRow [ spacing 10 ]
+                            [ inputLabel v
+                            , inputValue v
+                            , inputCoef (Coef n c)
+                            , text <| Round.round 1 c
+                            ]
+                    )
+                    model.initialPoint
+                    newCoefs
 
     else
         Element.none
@@ -524,6 +610,31 @@ inputValue (Variable name value) =
         }
 
 
+inputCoef : Coef -> Element Msg
+inputCoef (Coef name coef) =
+    Input.slider
+        [ Element.height (Element.px 30)
+        , Element.behindContent
+            (Element.el
+                [ Element.width Element.fill
+                , Element.height (Element.px 2)
+                , Element.centerY
+                , Background.color (rgb255 150 150 150)
+                , Border.rounded 2
+                ]
+                Element.none
+            )
+        ]
+        { onChange = CoefChanged name
+        , label = Input.labelAbove [] (text <| "Viscosity:")
+        , min = 0.0
+        , max = 3.0
+        , step = Just 0.1
+        , value = coef
+        , thumb = Input.defaultThumb
+        }
+
+
 displayValue : Variable -> Element Msg
 displayValue (Variable name value) =
     text <|
@@ -542,7 +653,14 @@ variation (Variable initial_name initial_value) (Variable target_name target_val
                 Just target ->
                     let
                         v =
-                            (target - initial) / initial * 100 |> truncate
+                            (target - initial) / initial * 100
+
+                        strv =
+                            if isInfinite v then
+                                "an infinity"
+
+                            else
+                                Round.round 0 v
 
                         direction =
                             if v > 0 then
@@ -566,7 +684,7 @@ variation (Variable initial_name initial_value) (Variable target_name target_val
                             (text direction)
                         , el [ Font.bold ] (text target_name)
                         , text " by "
-                        , el [ Font.bold, colorize v ] (text <| String.fromInt v ++ " %")
+                        , el [ Font.bold, colorize v ] (text <| strv ++ " %")
                         ]
 
                 Nothing ->
@@ -574,12 +692,6 @@ variation (Variable initial_name initial_value) (Variable target_name target_val
 
         Nothing ->
             Element.none
-
-
-approx : Float -> Float -> Float
-approx precision x =
-    -- precision = nb chiffres après la virgule
-    x |> (*) (10 ^ precision) |> truncate |> toFloat |> (*) (10 ^ -precision)
 
 
 neverFloat : Never -> Float
