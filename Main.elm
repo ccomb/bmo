@@ -408,15 +408,23 @@ queryFormula inputstring =
     UrlBuilder.absolute [ "optimize" ] [ UrlBuilder.string "formula" inputstring ]
 
 
-queryResult : Formula -> Point -> String
-queryResult inputstring point =
+queryResult : Formula -> Point -> Coefs -> String
+queryResult inputstring point coefs =
     UrlBuilder.absolute [ "optimize" ]
-        ([ UrlBuilder.string "formula" inputstring ] ++ List.map queryParam point)
+        ([ UrlBuilder.string "formula" inputstring ]
+            ++ List.map queryPoint point
+            ++ List.map queryCoef coefs
+        )
 
 
-queryParam : Variable -> UrlBuilder.QueryParameter
-queryParam (Variable name value) =
+queryPoint : Variable -> UrlBuilder.QueryParameter
+queryPoint (Variable name value) =
     UrlBuilder.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "")
+
+
+queryCoef : Coef -> UrlBuilder.QueryParameter
+queryCoef (Coef name value) =
+    UrlBuilder.string ("coef_" ++ name) (value |> String.fromFloat)
 
 
 getVariables : Model -> Cmd Msg
@@ -430,7 +438,7 @@ getVariables model =
 getResult : Model -> Cmd Msg
 getResult model =
     Http.get
-        { url = model.host ++ queryResult model.formula model.initialPoint
+        { url = model.host ++ queryResult model.formula model.initialPoint model.coefs
         , expect = Http.expectJson GotResult resultDecoder
         }
 
@@ -570,19 +578,21 @@ initialPoint model =
             newCoefs =
                 Dict.union
                     (model.coefs |> List.map (\(Coef n v) -> ( n, v )) |> Dict.fromList)
-                    (model.initialPoint |> List.map (\(Variable n v) -> ( n, 1.0 )) |> Dict.fromList)
+                    (model.initialPoint |> List.map (\(Variable n v) -> ( "coef_" ++ n, 1.0 )) |> Dict.fromList)
                     |> Dict.toList
                     |> List.map (\( n, v ) -> Coef n v)
+
+            maxLabelSize =
+                Maybe.withDefault 0 <| List.maximum <| List.map (\(Variable n v) -> String.length n) model.initialPoint
         in
         column blockAttributes <|
             [ row [] [ text "Your current situation:" ] ]
                 ++ List.map2
-                    (\v (Coef n c) ->
-                        wrappedRow [ spacing 10 ]
-                            [ inputLabel v
-                            , inputValue v
-                            , inputCoef (Coef n c)
-                            , text <| Round.round 1 c
+                    (\(Variable vn vv) (Coef cn cv) ->
+                        wrappedRow [ spacing 50 ]
+                            [ el [ Font.family [ Font.monospace ] ] (text <| String.padRight maxLabelSize ' ' vn)
+                            , inputValue (Variable vn vv)
+                            , inputCoef (Coef cn cv)
                             ]
                     )
                     model.initialPoint
@@ -590,11 +600,6 @@ initialPoint model =
 
     else
         Element.none
-
-
-inputLabel : Variable -> Element Msg
-inputLabel (Variable name value) =
-    el [] (text name)
 
 
 inputValue : Variable -> Element Msg
@@ -626,7 +631,7 @@ inputCoef (Coef name coef) =
             )
         ]
         { onChange = CoefChanged name
-        , label = Input.labelAbove [] (text <| "Viscosity:")
+        , label = Input.labelAbove [] (text <| "Viscosity = " ++ Round.round 1 coef)
         , min = 0.0
         , max = 3.0
         , step = Just 0.1

@@ -117,9 +117,9 @@ async def home(request: Request):
         _id = request.path_params.get("rest_of_path", "")
         doc = CLIENT.bmo.optim.find_one({"_id": _id})
         flags["formula"] = doc.get("formula", "")
-        flags["initial_point"] = doc.get("initial_point")
-        flags["coefs"] = doc.get("coefs")
-        flags["closest_solution"] = doc.get("closest_solution")
+        flags["initial_point"] = doc.get("initial_point", {})
+        flags["coefs"] = doc.get("coefs", {})
+        flags["closest_solution"] = doc.get("closest_solution", {})
     except Exception:
         pass
     return templates.TemplateResponse(
@@ -137,7 +137,7 @@ def function_to_minimize(formula, initial_point=dict(), coefs=dict()):
           such as : '218*t*p*f - (p+s)*(b*1.38+12*n)+c=0'
         - an initial point
 
-    returns a tuple (fdistance, fpivot, pivot, varsd where
+    returns a tuple (fdistance, fpivot, pivot, vars) where
         - fdistance is a function representing the distance
           from an initial point to the surface
         - fpivot is the function to compute the pivot from the other variables
@@ -222,6 +222,7 @@ def store(formula, initial_point, coefs, closest_solution):
     doc = {
         "formula": formula,
         "initial_point": initial_point,
+        "coefs": coefs,
         "closest_point": closest_solution,
     }
     # trunk the sha1 depending on the number of record to keep short urls
