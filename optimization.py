@@ -25,7 +25,7 @@ CLIENT = MongoClient("/tmp/mongodb-27017.sock", username="root", password=MONGOP
 
 
 @api.get("/optimize", response_class=JSONResponse)
-async def optimize(request: Request, formula: str = ""):
+async def optimize(request: Request, formula: str = "", objective: str = ""):
     try:
         fdistance, fpivot, pivot, vars_wo_pivot = function_to_minimize(formula)
         if "formula" in [pivot] + vars_wo_pivot:
@@ -68,7 +68,7 @@ async def optimize(request: Request, formula: str = ""):
     try:
         # compute the distance formula
         fdistance, fpivot, pivot, vars_wo_pivot = function_to_minimize(
-            formula, initial_point, coefs
+            formula, initial_point, coefs, objective
         )
     except Exception:
         return {"status": "Error : I cannot use the provided input"}
@@ -112,11 +112,13 @@ async def home(request: Request):
         "initial_point": {},
         "coefs": {},
         "closest_solution": {},
+        "objective": "",
     }
     try:
         _id = request.path_params.get("rest_of_path", "")
         doc = CLIENT.bmo.optim.find_one({"_id": _id})
         flags["formula"] = doc.get("formula", "")
+        flags["objective"] = doc.get("objective", "")
         flags["initial_point"] = doc.get("initial_point", {})
         flags["coefs"] = doc.get("coefs", {})
         flags["closest_solution"] = doc.get("closest_solution", {})
@@ -130,7 +132,7 @@ async def home(request: Request):
 # formula = '218*t*p*f - (p+s)*(b*1.38+12*n)+c = 0'
 
 
-def function_to_minimize(formula, initial_point=dict(), coefs=dict()):
+def function_to_minimize(formula, initial_point=dict(), coefs=dict(), objective=None):
     """take :
         - a formula with N variables as a string,
           representing a surface of dimension N-1 in a space of dimension N
@@ -172,9 +174,10 @@ def function_to_minimize(formula, initial_point=dict(), coefs=dict()):
     # variables for the difficulty to change variables
     coef_vars = ["coef_" + v for v in variables]
 
-    # arbitrarily choose the 1st variable as the pivot to extract
+    # choose the provided pivot as the variable to extract,
+    # or arbitrarily choose the 1st variable
     # TODO try without explicit pivot
-    pivot = variables[0]
+    pivot = objective or variables[0]
     vars_wo_pivot = [v for v in variables if v != pivot]
 
     # symbolic representation of the formula
@@ -204,7 +207,6 @@ def function_to_minimize(formula, initial_point=dict(), coefs=dict()):
             for v in vars_wo_pivot
         )
     )
-    print(symdistance)
     f = lambdify(sorted(vars_wo_pivot + initial_vars + coef_vars), symdistance)
 
     def fdistance(x):

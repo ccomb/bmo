@@ -5,6 +5,7 @@ import Browser.Navigation as Nav
 import Char exposing (isAlpha)
 import Debouncer.Messages as Debouncer exposing (Debouncer, fromSeconds, provideInput, settleWhenQuietFor, toDebouncer)
 import Dict
+import Dropdown
 import Element exposing (Attribute, Element, centerX, column, el, fill, maximum, padding, paddingEach, paddingXY, paragraph, px, rgb255, row, spacing, text, width, wrappedRow)
 import Element.Background as Background
 import Element.Border as Border
@@ -57,6 +58,10 @@ type alias Formula =
     String
 
 
+type alias Objective =
+    String
+
+
 type alias Model =
     { formula : Formula
     , initialPoint : Point
@@ -69,6 +74,8 @@ type alias Model =
     , navkey : Nav.Key
     , route : Route
     , error : Maybe String
+    , dropdownState : Dropdown.State Objective
+    , selectedObjective : Maybe Objective
     }
 
 
@@ -83,6 +90,8 @@ type Msg
     | Delay (Debouncer.Msg Msg)
     | LinkClicked UrlRequest
     | UrlChanged Url
+    | OptionPicked (Maybe Objective)
+    | DropdownMsg (Dropdown.Msg Objective)
 
 
 type alias OptimizationResult =
@@ -167,12 +176,80 @@ init value url key =
             , route = parseUrl url
             , navkey = key
             , error = Nothing
+            , dropdownState = Dropdown.init "Select your objective"
+            , selectedObjective = Nothing
             }
     in
     ( model
     , Task.perform ((\_ -> GetVariables) >> provideInput >> Delay)
         (Task.succeed "")
     )
+
+
+pointToNames : Point -> List String
+pointToNames point =
+    List.map (\(Variable n v) -> n) point
+
+
+dropdownConfig : Model -> Dropdown.Config Objective Msg Model
+dropdownConfig model =
+    let
+        containerAttrs =
+            [ width (px 300) ]
+
+        selectAttrs =
+            [ Border.width 1, Border.rounded 5, paddingXY 16 8, spacing 10, width fill ]
+
+        searchAttrs =
+            [ Border.width 0, padding 0 ]
+
+        listAttrs =
+            [ Border.width 1
+            , Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 5, bottomRight = 5 }
+            , width fill
+            , spacing 5
+            ]
+
+        itemToPrompt item =
+            text item
+
+        itemToElement selected highlighted i =
+            let
+                bgColor =
+                    if highlighted then
+                        rgb255 70 70 70
+
+                    else if selected then
+                        rgb255 80 80 80
+
+                    else
+                        rgb255 50 50 50
+            in
+            row
+                [ Background.color bgColor
+                , padding 8
+                , spacing 10
+                , width fill
+                ]
+                [ el [] (text "-")
+                , el [ Font.size 16 ] (text i)
+                ]
+    in
+    Dropdown.filterable
+        { itemsFromModel = always <| pointToNames model.initialPoint
+        , selectionFromModel = .selectedObjective
+        , dropdownMsg = DropdownMsg
+        , onSelectMsg = OptionPicked
+        , itemToPrompt = itemToPrompt
+        , itemToElement = itemToElement
+        , itemToText = identity
+        }
+        |> Dropdown.withContainerAttributes containerAttrs
+        |> Dropdown.withPromptElement (el [] (text "Select option"))
+        |> Dropdown.withFilterPlaceholder "Type for option"
+        |> Dropdown.withSelectAttributes selectAttrs
+        |> Dropdown.withListAttributes listAttrs
+        |> Dropdown.withSearchAttributes searchAttrs
 
 
 
@@ -341,6 +418,18 @@ update msg model =
                 , Cmd.none
                 )
 
+        OptionPicked option ->
+            ( { model | selectedObjective = option }
+            , Task.perform ((\_ -> GetResult) >> provideInput >> Delay) (Task.succeed "")
+            )
+
+        DropdownMsg subMsg ->
+            let
+                ( state, cmd ) =
+                    Dropdown.update (dropdownConfig model) subMsg model model.dropdownState
+            in
+            ( { model | dropdownState = state }, cmd )
+
 
 httpErrorToString : Http.Error -> Maybe String
 httpErrorToString error =
@@ -408,12 +497,13 @@ queryFormula inputstring =
     UrlBuilder.absolute [ "optimize" ] [ UrlBuilder.string "formula" inputstring ]
 
 
-queryResult : Formula -> Point -> Coefs -> String
-queryResult inputstring point coefs =
+queryResult : Formula -> Point -> Coefs -> Maybe Objective -> String
+queryResult inputstring point coefs objective =
     UrlBuilder.absolute [ "optimize" ]
         ([ UrlBuilder.string "formula" inputstring ]
             ++ List.map queryPoint point
             ++ List.map queryCoef coefs
+            ++ queryObjective objective
         )
 
 
@@ -427,6 +517,16 @@ queryCoef (Coef name value) =
     UrlBuilder.string ("coef_" ++ name) (value |> String.fromFloat)
 
 
+queryObjective : Maybe Objective -> List UrlBuilder.QueryParameter
+queryObjective objective =
+    case objective of
+        Nothing ->
+            []
+
+        Just o ->
+            [ UrlBuilder.string "objective" o ]
+
+
 getVariables : Model -> Cmd Msg
 getVariables model =
     Http.get
@@ -438,7 +538,7 @@ getVariables model =
 getResult : Model -> Cmd Msg
 getResult model =
     Http.get
-        { url = model.host ++ queryResult model.formula model.initialPoint model.coefs
+        { url = model.host ++ queryResult model.formula model.initialPoint model.coefs model.selectedObjective
         , expect = Http.expectJson GotResult resultDecoder
         }
 
@@ -512,6 +612,7 @@ view model =
           <|
             column [ centerX, spacing 20, width <| maximum 700 fill ] <|
                 [ inputFormula model
+                , inputObjective model
                 , initialPoint model
                 , nearestPoint model
                 ]
@@ -525,13 +626,26 @@ inputFormula model =
         [ Input.text
             [ width fill
             , Font.color (rgb255 50 50 50)
+            , Font.size 15
+            , Font.family [ Font.monospace ]
             , Input.focusedOnLoad
             ]
             { onChange = FormulaChanged
             , text = model.formula
             , placeholder = placeholder model
-            , label = Input.labelAbove [ Font.size 30 ] (text "Enter your formula:")
+            , label = Input.labelAbove [ Font.size 25 ] (text "Enter your formula:")
             }
+        ]
+
+
+inputObjective : Model -> Element Msg
+inputObjective model =
+    column blockAttributes
+        [ row [] [ text "Select the variable corresponding to your goal" ]
+        , row []
+            [ Dropdown.view (dropdownConfig model) model model.dropdownState
+                |> el []
+            ]
         ]
 
 
