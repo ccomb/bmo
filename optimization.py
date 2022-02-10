@@ -23,6 +23,8 @@ templates = Jinja2Templates(directory=".")
 MONGOPASSWORD = os.environ.get("MONGO_INITDB_ROOT_PASSWORD", "root")
 CLIENT = MongoClient("/tmp/mongodb-27017.sock", username="root", password=MONGOPASSWORD)
 
+reserved_words = ["sqrt"]
+
 
 @api.get("/optimize", response_class=JSONResponse)
 async def optimize(request: Request, formula: str = "", objective: str = ""):
@@ -166,7 +168,7 @@ def function_to_minimize(formula, initial_point=dict(), coefs=dict(), objective=
         )
     )
     # variables in the formula
-    variables = sorted(leftvars + rightvars)
+    variables = [w for w in sorted(leftvars + rightvars) if w not in reserved_words]
 
     # variables for initial values
     initial_vars = ["initial_" + v for v in variables]
@@ -179,10 +181,12 @@ def function_to_minimize(formula, initial_point=dict(), coefs=dict(), objective=
     # TODO try without explicit pivot
     pivot = objective or variables[0]
     vars_wo_pivot = [v for v in variables if v != pivot]
-
-    # symbolic representation of the formula
-    symleft = eval(left, {v: symbols(v) for v in leftvars})
-    symright = eval(right, {v: symbols(v) for v in rightvars})
+    leftvars = {v: symbols(v) for v in leftvars}
+    leftvars["sqrt"] = sympy.sqrt
+    symleft = eval(left, leftvars)
+    rightvars = {v: symbols(v) for v in rightvars}
+    rightvars["sqrt"] = sympy.sqrt
+    symright = eval(right, rightvars)
 
     # compute the formula and function to get the pivot from other variables
     sympivot = solve(Eq(symleft, symright), symbols(pivot))[0]

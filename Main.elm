@@ -374,7 +374,16 @@ update msg model =
                     )
 
                 Err error ->
-                    ( { model | nearestPoint = [], spinnerR = False, error = httpErrorToString error }
+                    ( { model
+                        | nearestPoint = []
+                        , spinnerR = False
+                        , error =
+                            if model.nearestPoint /= [] then
+                                httpErrorToString error
+
+                            else
+                                Nothing
+                      }
                     , Cmd.none
                     )
 
