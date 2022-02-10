@@ -12,17 +12,17 @@
     , "type": "image/svg+xml"
     , "sizes": "48x48 72x72 96x96 128x128 256x256"
     , "density": 2
-    , "purpose": "any maskable"
+    , "purpose": "any"
     }
   , { "src": "bmo192.png"
     , "type": "image/png"
     , "sizes": "192x192"
-    , "purpose": "any maskable"
+    , "purpose": "any"
     }
   , { "src": "bmo512.png"
     , "type": "image/png"
     , "sizes": "512x512"
-    , "purpose": "any maskable"
+    , "purpose": "any"
     }
   ]
 , "orientation": "portrait"
