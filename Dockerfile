@@ -1,5 +1,19 @@
 from debian:11
 
+COPY . /srv/
+WORKDIR /srv
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl gzip npm uglifyjs \
+    && curl -L -o elm.gz https://github.com/elm/compiler/releases/download/0.19.1/binary-for-linux-64-bit.gz \
+    && gunzip elm.gz \
+    && chmod +x elm \
+    && mv elm /usr/local/bin/ \
+    && ./build.sh -o
+
+
+from debian:11
+
+COPY --from=0 /srv/static/app.js /srv/static/
 ENV DEBIAN_FRONTEND noninteractive
 ENV LASTBUILD 2021100601
 ENV LANG C.UTF-8
@@ -7,11 +21,11 @@ ENV LANG C.UTF-8
 RUN set -x; \
     apt-get update \
     && apt-get install -y --no-install-recommends \
-	python3-aiofiles \
-	python3-jinja2 \
-	python3-pymongo \
-	python3-uvicorn \
-	uvicorn \
+        python3-aiofiles \
+        python3-jinja2 \
+        python3-pymongo \
+        python3-uvicorn \
+        uvicorn \
         python3-fastapi \
         python3-numpy \
         python3-scipy \

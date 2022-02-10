@@ -1,3 +1,4 @@
 __pycache__/
 elm-stuff/
 .*.swp
+static/app.js
