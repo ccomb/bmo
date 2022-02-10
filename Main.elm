@@ -621,8 +621,14 @@ view model =
 
 inputFormula : Model -> E.Element Msg
 inputFormula model =
-    E.row (blockAttributes ++ [ E.paddingEach { blockEdges | top = 50 } ])
-        [ Input.text
+    E.column (blockAttributes ++ [ E.paddingEach { blockEdges | top = 50 } ])
+        [ E.row [ E.width E.fill ]
+            [ E.link []
+                { url = String.replace "app" "www" model.host
+                , label = E.text "← Back to home page"
+                }
+            ]
+        , Input.text
             [ E.width E.fill
             , Font.color (E.rgb255 50 50 50)
             , Font.size 15
