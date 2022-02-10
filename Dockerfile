@@ -1,14 +1,15 @@
 from debian:11 AS build
 
-COPY . /srv/
 WORKDIR /srv
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl gzip npm uglifyjs \
     && curl -L -o elm.gz https://github.com/elm/compiler/releases/download/0.19.1/binary-for-linux-64-bit.gz \
     && gunzip elm.gz \
     && chmod +x elm \
-    && mv elm /usr/local/bin/ \
-    && ./build.sh -o
+    && mv elm /usr/local/bin/
+
+COPY . /srv/
+RUN ./build.sh -o
 
 
 from debian:11
