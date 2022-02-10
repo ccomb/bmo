@@ -13,7 +13,6 @@ RUN apt-get update \
 
 from debian:11
 
-COPY --from=0 /srv/static/app.js /srv/static/
 ENV DEBIAN_FRONTEND noninteractive
 ENV LASTBUILD 2021100601
 ENV LANG C.UTF-8
@@ -35,6 +34,7 @@ RUN set -x; \
 COPY optimization.py /srv/
 COPY index.html /srv/
 COPY static /srv/static
+COPY --from=0 /srv/static/app.js /srv/static/
 WORKDIR /srv
 EXPOSE 8000
 CMD ["uvicorn", "--host", "0.0.0.0", "optimization:api"]
