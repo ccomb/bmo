@@ -706,7 +706,8 @@ initialPoint model =
                         wrappedRow [ spacing 50 ]
                             [ el [ Font.family [ Font.monospace ] ] (text <| String.padRight maxLabelSize ' ' vn)
                             , inputValue (Variable vn vv)
-                            , inputCoef (Coef cn cv)
+
+                            --, inputCoef (Coef cn cv)
                             ]
                     )
                     model.initialPoint
