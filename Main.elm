@@ -2,11 +2,10 @@ module Main exposing (main)
 
 import Browser exposing (Document, UrlRequest, application)
 import Browser.Navigation as Nav
-import Char exposing (isAlpha)
-import Debouncer.Messages as Debouncer exposing (Debouncer, fromSeconds, provideInput, settleWhenQuietFor, toDebouncer)
+import Debouncer.Messages as Debouncer exposing (Debouncer)
 import Dict
 import Dropdown
-import Element exposing (Attribute, Element, centerX, column, el, fill, maximum, padding, paddingEach, paddingXY, paragraph, px, rgb255, row, spacing, text, width, wrappedRow)
+import Element as E
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
@@ -18,13 +17,13 @@ import Json.Decode as Decode
 import Process
 import Result
 import Round
-import Route exposing (Route, parseUrl)
+import Route exposing (Route)
 import Set
 import Task
 import Tuple exposing (first, second)
 import Url exposing (Url)
 import Url.Builder as UrlBuilder
-import Url.Parser exposing ((<?>), Parser, parse, query, string, top)
+import Url.Parser as Parser exposing (Parser)
 import Url.Parser.Query as Query
 
 
@@ -123,12 +122,12 @@ defaultPlaceholder =
 
 formulaParser : Parser (Maybe Formula -> a) a
 formulaParser =
-    query <| Query.string "formula"
+    Parser.query <| Query.string "formula"
 
 
 initialVariableParser : String -> Parser (Maybe String -> a) a
 initialVariableParser variable =
-    query <| Query.string variable
+    Parser.query <| Query.string variable
 
 
 
@@ -139,7 +138,7 @@ init : Decode.Value -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init value url key =
     let
         formula =
-            parse formulaParser url |> Maybe.withDefault Nothing |> Maybe.withDefault ""
+            Parser.parse formulaParser url |> Maybe.withDefault Nothing |> Maybe.withDefault ""
 
         flags =
             case Decode.decodeValue flagsDecoder value of
@@ -160,7 +159,7 @@ init value url key =
             , coefs = flags.coefs
             , nearestPoint = []
             , host = flags.host
-            , debouncer = Debouncer.manual |> settleWhenQuietFor (Just <| fromSeconds 1.5) |> toDebouncer
+            , debouncer = Debouncer.manual |> Debouncer.settleWhenQuietFor (Just <| Debouncer.fromSeconds 1.5) |> Debouncer.toDebouncer
             , spinnerV =
                 if formula /= "" then
                     True
@@ -173,7 +172,7 @@ init value url key =
 
                 else
                     False
-            , route = parseUrl url
+            , route = Route.parseUrl url
             , navkey = key
             , error = Nothing
             , dropdownState = Dropdown.init "Select your objective"
@@ -181,7 +180,7 @@ init value url key =
             }
     in
     ( model
-    , Task.perform ((\_ -> GetVariables) >> provideInput >> Delay)
+    , Task.perform ((\_ -> GetVariables) >> Debouncer.provideInput >> Delay)
         (Task.succeed "")
     )
 
@@ -195,44 +194,44 @@ dropdownConfig : Model -> Dropdown.Config Objective Msg Model
 dropdownConfig model =
     let
         containerAttrs =
-            [ width (px 300) ]
+            [ E.width (E.px 300) ]
 
         selectAttrs =
-            [ Border.width 1, Border.rounded 5, paddingXY 16 8, spacing 10, width fill ]
+            [ Border.width 1, Border.rounded 5, E.paddingXY 16 8, E.spacing 10, E.width E.fill ]
 
         searchAttrs =
-            [ Border.width 0, padding 0 ]
+            [ Border.width 0, E.padding 0 ]
 
         listAttrs =
             [ Border.width 1
             , Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 5, bottomRight = 5 }
-            , width fill
-            , spacing 5
+            , E.width E.fill
+            , E.spacing 5
             ]
 
         itemToPrompt item =
-            text item
+            E.text item
 
         itemToElement selected highlighted i =
             let
                 bgColor =
                     if highlighted then
-                        rgb255 70 70 70
+                        E.rgb255 70 70 70
 
                     else if selected then
-                        rgb255 80 80 80
+                        E.rgb255 80 80 80
 
                     else
-                        rgb255 50 50 50
+                        E.rgb255 50 50 50
             in
-            row
+            E.row
                 [ Background.color bgColor
-                , padding 8
-                , spacing 10
-                , width fill
+                , E.padding 8
+                , E.spacing 10
+                , E.width E.fill
                 ]
-                [ el [] (text "-")
-                , el [ Font.size 16 ] (text i)
+                [ E.el [] (E.text "-")
+                , E.el [ Font.size 16 ] (E.text i)
                 ]
     in
     Dropdown.filterable
@@ -245,7 +244,7 @@ dropdownConfig model =
         , itemToText = identity
         }
         |> Dropdown.withContainerAttributes containerAttrs
-        |> Dropdown.withPromptElement (el [] (text "Select option"))
+        |> Dropdown.withPromptElement (E.el [] (E.text "Select option"))
         |> Dropdown.withFilterPlaceholder "Type for option"
         |> Dropdown.withSelectAttributes selectAttrs
         |> Dropdown.withListAttributes listAttrs
@@ -286,7 +285,7 @@ update msg model =
                     else
                         model.nearestPoint
               }
-            , Task.perform ((\_ -> GetVariables) >> provideInput >> Delay)
+            , Task.perform ((\_ -> GetVariables) >> Debouncer.provideInput >> Delay)
                 (Task.succeed "")
             )
 
@@ -326,7 +325,7 @@ update msg model =
             in
             if isFilled newpoint then
                 ( { model | initialPoint = newpoint, coefs = newcoefs, spinnerR = True }
-                , Task.perform ((\_ -> GetResult) >> provideInput >> Delay) (Task.succeed "")
+                , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
                 )
 
             else
@@ -383,7 +382,7 @@ update msg model =
             Debouncer.update update updateDebouncer subMsg model
 
         UrlChanged url ->
-            ( { model | route = parseUrl url }
+            ( { model | route = Route.parseUrl url }
             , Cmd.none
             )
 
@@ -410,7 +409,7 @@ update msg model =
             in
             if isFilled model.initialPoint then
                 ( { model | coefs = newcoefs, spinnerR = True }
-                , Task.perform ((\_ -> GetResult) >> provideInput >> Delay) (Task.succeed "")
+                , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
                 )
 
             else
@@ -420,7 +419,7 @@ update msg model =
 
         OptionPicked option ->
             ( { model | selectedObjective = option }
-            , Task.perform ((\_ -> GetResult) >> provideInput >> Delay) (Task.succeed "")
+            , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
             )
 
         DropdownMsg subMsg ->
@@ -604,13 +603,13 @@ view : Model -> Document Msg
 view model =
     { title = "BMO"
     , body =
-        [ Element.layout
-            [ Background.color (rgb255 42 44 43)
-            , Font.color (rgb255 217 203 158)
-            , paddingEach { top = 10, right = 0, bottom = 100, left = 0 }
+        [ E.layout
+            [ Background.color (E.rgb255 42 44 43)
+            , Font.color (E.rgb255 217 203 158)
+            , E.paddingEach { top = 10, right = 0, bottom = 100, left = 0 }
             ]
           <|
-            column [ centerX, spacing 20, width <| maximum 700 fill ] <|
+            E.column [ E.centerX, E.spacing 20, E.width <| E.maximum 700 E.fill ] <|
                 [ inputFormula model
                 , inputObjective model
                 , initialPoint model
@@ -620,12 +619,12 @@ view model =
     }
 
 
-inputFormula : Model -> Element Msg
+inputFormula : Model -> E.Element Msg
 inputFormula model =
-    row (blockAttributes ++ [ paddingEach { blockEdges | top = 50 } ])
+    E.row (blockAttributes ++ [ E.paddingEach { blockEdges | top = 50 } ])
         [ Input.text
-            [ width fill
-            , Font.color (rgb255 50 50 50)
+            [ E.width E.fill
+            , Font.color (E.rgb255 50 50 50)
             , Font.size 15
             , Font.family [ Font.monospace ]
             , Input.focusedOnLoad
@@ -633,18 +632,18 @@ inputFormula model =
             { onChange = FormulaChanged
             , text = model.formula
             , placeholder = placeholder model
-            , label = Input.labelAbove [ Font.size 25 ] (text "Enter your formula:")
+            , label = Input.labelAbove [ Font.size 25 ] (E.text "Enter your formula:")
             }
         ]
 
 
-inputObjective : Model -> Element Msg
+inputObjective : Model -> E.Element Msg
 inputObjective model =
-    column blockAttributes
-        [ row [] [ text "Select the variable corresponding to your goal" ]
-        , row []
+    E.column blockAttributes
+        [ E.row [] [ E.text "Select the variable corresponding to your goal" ]
+        , E.row []
             [ Dropdown.view (dropdownConfig model) model model.dropdownState
-                |> el []
+                |> E.el []
             ]
         ]
 
@@ -653,7 +652,7 @@ placeholder : Model -> Maybe (Input.Placeholder msg)
 placeholder model =
     Just <|
         Input.placeholder []
-            (text <|
+            (E.text <|
                 if model.formula == "" then
                     defaultPlaceholder
 
@@ -662,30 +661,30 @@ placeholder model =
             )
 
 
-spinnerImage : Element Msg
+spinnerImage : E.Element Msg
 spinnerImage =
-    Element.image [] { src = "/static/spinner.png", description = "spinner" }
+    E.image [] { src = "/static/spinner.png", description = "spinner" }
 
 
 blockEdges =
     { top = 20, bottom = 50, left = 50, right = 50 }
 
 
-blockAttributes : List (Attribute Msg)
+blockAttributes : List (E.Attribute Msg)
 blockAttributes =
-    [ Background.color (rgb255 70 70 70)
-    , spacing 20
-    , paddingEach blockEdges
-    , centerX
-    , width fill
+    [ Background.color (E.rgb255 70 70 70)
+    , E.spacing 20
+    , E.paddingEach blockEdges
+    , E.centerX
+    , E.width E.fill
     , Border.rounded 15
     ]
 
 
-initialPoint : Model -> Element Msg
+initialPoint : Model -> E.Element Msg
 initialPoint model =
     if model.spinnerV then
-        column blockAttributes [ spinnerImage ]
+        E.column blockAttributes [ spinnerImage ]
 
     else if model.initialPoint /= [] then
         let
@@ -699,12 +698,12 @@ initialPoint model =
             maxLabelSize =
                 Maybe.withDefault 0 <| List.maximum <| List.map (\(Variable n v) -> String.length n) model.initialPoint
         in
-        column blockAttributes <|
-            [ row [] [ text "Your current situation:" ] ]
+        E.column blockAttributes <|
+            [ E.row [] [ E.text "Your current situation:" ] ]
                 ++ List.map2
                     (\(Variable vn vv) (Coef cn cv) ->
-                        wrappedRow [ spacing 50 ]
-                            [ el [ Font.family [ Font.monospace ] ] (text <| String.padRight maxLabelSize ' ' vn)
+                        E.wrappedRow [ E.spacing 50 ]
+                            [ E.el [ Font.family [ Font.monospace ] ] (E.text <| String.padRight maxLabelSize ' ' vn)
                             , inputValue (Variable vn vv)
 
                             --, inputCoef (Coef cn cv)
@@ -714,14 +713,14 @@ initialPoint model =
                     newCoefs
 
     else
-        Element.none
+        E.none
 
 
-inputValue : Variable -> Element Msg
+inputValue : Variable -> E.Element Msg
 inputValue (Variable name value) =
     Input.text
-        [ width fill
-        , Font.color (rgb255 50 50 50)
+        [ E.width E.fill
+        , Font.color (E.rgb255 50 50 50)
         ]
         { onChange = InitialValueChanged name
         , text = value
@@ -730,23 +729,23 @@ inputValue (Variable name value) =
         }
 
 
-inputCoef : Coef -> Element Msg
+inputCoef : Coef -> E.Element Msg
 inputCoef (Coef name coef) =
     Input.slider
-        [ Element.height (Element.px 30)
-        , Element.behindContent
-            (Element.el
-                [ Element.width Element.fill
-                , Element.height (Element.px 2)
-                , Element.centerY
-                , Background.color (rgb255 150 150 150)
+        [ E.height (E.px 30)
+        , E.behindContent
+            (E.el
+                [ E.width E.fill
+                , E.height (E.px 2)
+                , E.centerY
+                , Background.color (E.rgb255 150 150 150)
                 , Border.rounded 2
                 ]
-                Element.none
+                E.none
             )
         ]
         { onChange = CoefChanged name
-        , label = Input.labelAbove [] (text <| "Viscosity = " ++ Round.round 1 coef)
+        , label = Input.labelAbove [] (E.text <| "Viscosity = " ++ Round.round 1 coef)
         , min = 0.0
         , max = 3.0
         , step = Just 0.1
@@ -755,9 +754,9 @@ inputCoef (Coef name coef) =
         }
 
 
-displayValue : Variable -> Element Msg
+displayValue : Variable -> E.Element Msg
 displayValue (Variable name value) =
-    text <|
+    E.text <|
         (value
             |> String.toFloat
             |> Maybe.map String.fromFloat
@@ -765,7 +764,7 @@ displayValue (Variable name value) =
         )
 
 
-variation : Variable -> Variable -> Element Msg
+variation : Variable -> Variable -> E.Element Msg
 variation (Variable initial_name initial_value) (Variable target_name target_value) =
     case String.toFloat initial_value of
         Just initial ->
@@ -792,26 +791,26 @@ variation (Variable initial_name initial_value) (Variable target_name target_val
                         colorize =
                             \x ->
                                 if x >= 0 then
-                                    Font.color (rgb255 0 200 0)
+                                    Font.color (E.rgb255 0 200 0)
 
                                 else
-                                    Font.color (rgb255 200 0 0)
+                                    Font.color (E.rgb255 200 0 0)
                     in
-                    paragraph
+                    E.paragraph
                         []
-                        [ el
+                        [ E.el
                             [ colorize v ]
-                            (text direction)
-                        , el [ Font.bold ] (text target_name)
-                        , text " by "
-                        , el [ Font.bold, colorize v ] (text <| strv ++ " %")
+                            (E.text direction)
+                        , E.el [ Font.bold ] (E.text target_name)
+                        , E.text " by "
+                        , E.el [ Font.bold, colorize v ] (E.text <| strv ++ " %")
                         ]
 
                 Nothing ->
-                    Element.none
+                    E.none
 
         Nothing ->
-            Element.none
+            E.none
 
 
 neverFloat : Never -> Float
@@ -819,24 +818,24 @@ neverFloat =
     never
 
 
-nearestPoint : Model -> Element Msg
+nearestPoint : Model -> E.Element Msg
 nearestPoint model =
     if model.spinnerR then
-        column blockAttributes [ spinnerImage ]
+        E.column blockAttributes [ spinnerImage ]
 
     else if model.initialPoint /= [] then
         if not <| isFilled model.initialPoint then
-            column blockAttributes
-                [ paragraph [] [ text "Fill in the initial values to compute the nearest solution" ] ]
+            E.column blockAttributes
+                [ E.paragraph [] [ E.text "Fill in the initial values to compute the nearest solution" ] ]
 
         else
-            column blockAttributes <|
-                [ text "To achieve your goals you should:" ]
+            E.column blockAttributes <|
+                [ E.text "To achieve your goals you should:" ]
                     ++ List.map2
                         (\iv tv ->
-                            row []
+                            E.row []
                                 [ variation iv tv
-                                , text " to reach a value of "
+                                , E.text " to reach a value of "
                                 , displayValue tv
                                 ]
                         )
@@ -844,27 +843,27 @@ nearestPoint model =
                         model.nearestPoint
 
     else
-        Maybe.map (\err -> column blockAttributes [ viewError model ]) model.error |> Maybe.withDefault Element.none
+        Maybe.map (\err -> E.column blockAttributes [ viewError model ]) model.error |> Maybe.withDefault E.none
 
 
-notfound : Model -> Element Msg
+notfound : Model -> E.Element Msg
 notfound model =
-    el [] (text "Not Found")
+    E.el [] (E.text "Not Found")
 
 
-viewError : Model -> Element Msg
+viewError : Model -> E.Element Msg
 viewError model =
     Maybe.map
         (\t ->
-            Element.paragraph
-                [ Font.color (rgb255 255 0 0)
-                , Background.color (rgb255 255 255 255)
-                , padding 10
+            E.paragraph
+                [ Font.color (E.rgb255 255 0 0)
+                , Background.color (E.rgb255 255 255 255)
+                , E.padding 10
                 ]
-                [ text t ]
+                [ E.text t ]
         )
         model.error
-        |> Maybe.withDefault Element.none
+        |> Maybe.withDefault E.none
 
 
 
