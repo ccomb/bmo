@@ -6,7 +6,7 @@
 , "dir": "ltr"
 , "lang": "fr"
 , "display": "fullscreen"
-, "start_url": "./"
+, "start_url": "https://app.business-model-optimizer.com/"
 , "icons":
   [ { "src": "bmo.svg"
     , "type": "image/svg+xml"
