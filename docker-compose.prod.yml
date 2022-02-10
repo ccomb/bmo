@@ -3,8 +3,6 @@ version: '3'
 services:
   ms:
     build: .
-    ports:
-      - "8000:8000"
     environment:
       HOST: "https://app.business-model-optimizer.com"
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
