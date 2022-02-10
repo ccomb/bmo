@@ -1,4 +1,4 @@
-from debian:11
+from debian:11 AS build
 
 COPY . /srv/
 WORKDIR /srv
@@ -34,7 +34,7 @@ RUN set -x; \
 COPY optimization.py /srv/
 COPY index.html /srv/
 COPY static /srv/static
-COPY --from=0 /srv/static/app.js /srv/static/
+COPY --from=build /srv/static/app.js /srv/static/
 WORKDIR /srv
 EXPOSE 8000
 CMD ["uvicorn", "--host", "0.0.0.0", "optimization:api"]
