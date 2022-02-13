@@ -2,3 +2,5 @@ __pycache__/
 elm-stuff/
 .*.swp
 static/app.js
+mongo.password
+deploy.prod.sh
