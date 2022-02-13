@@ -630,7 +630,7 @@ view model =
 
 inputFormula : Model -> E.Element Msg
 inputFormula model =
-    E.column (blockAttributes ++ [ E.paddingEach { blockEdges | top = 50 } ])
+    E.column (blockAttributes ++ [ E.paddingEach { blockEdges | top = 20 } ])
         [ E.row [ E.width E.fill ]
             [ E.link []
                 { url = String.replace "app" "www" model.host
