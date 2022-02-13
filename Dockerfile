@@ -6,7 +6,8 @@ RUN apt-get update \
     && curl -L -o elm.gz https://github.com/elm/compiler/releases/download/0.19.1/binary-for-linux-64-bit.gz \
     && gunzip elm.gz \
     && chmod +x elm \
-    && mv elm /usr/local/bin/
+    && mv elm /usr/local/bin/ \
+    && npm install -g elm-spa
 
 COPY . /srv/
 RUN ./build.sh -o
@@ -32,10 +33,9 @@ RUN set -x; \
         python3-sympy \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-COPY optimization.py /srv/
-COPY index.html /srv/
-COPY static /srv/static
-COPY --from=build /srv/static/app.js /srv/static/
-WORKDIR /srv
+COPY src/server.py /srv/src/server.py
+COPY public /srv/public
+COPY --from=build /srv/public/dist/elm.js /srv/public/dist/
+WORKDIR /srv/src
 EXPOSE 8000
-CMD ["uvicorn", "--host", "0.0.0.0", "optimization:api"]
+CMD ["uvicorn", "--host", "0.0.0.0", "server:api"]

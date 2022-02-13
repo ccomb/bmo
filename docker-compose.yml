@@ -8,7 +8,7 @@ services:
     volumes:
       - tmp:/tmp/
       - mongodata:/data
-      - ./:/srv
+      - .:/srv
 
   mongo:
     image: mongo:5

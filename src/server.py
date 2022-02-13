@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from hashlib import sha1
-from pymongo import MongoClient
+import pymongo
 from scipy.optimize import minimize
 from sympy import Eq, solve, symbols, lambdify
 import ast
@@ -17,11 +17,16 @@ import os
 import sympy
 
 api = FastAPI()
-api.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory=".")
+api.mount("/public", StaticFiles(directory="../public"), name="public")
+templates = Jinja2Templates(directory="../public")
 
 MONGOPASSWORD = os.environ.get("MONGO_INITDB_ROOT_PASSWORD", "root")
-CLIENT = MongoClient("/tmp/mongodb-27017.sock", username="root", password=MONGOPASSWORD)
+CLIENT = pymongo.MongoClient(
+    "/tmp/mongodb-27017.sock",
+    username="root",
+    password=MONGOPASSWORD,
+    serverSelectionTimeoutMS=5000,
+)
 
 reserved_words = ["sqrt"]
 
@@ -109,7 +114,6 @@ async def optimize(request: Request, formula: str = "", objective: str = ""):
 @api.get("/{rest_of_path:path}", response_class=HTMLResponse)
 async def home(request: Request):
     flags = {
-        "host": os.environ.get("HOST", "http://localhost:8000"),
         "formula": "",
         "initial_point": {},
         "coefs": {},
@@ -117,15 +121,18 @@ async def home(request: Request):
         "objective": "",
     }
     try:
-        _id = request.path_params.get("rest_of_path", "")
-        doc = CLIENT.bmo.optim.find_one({"_id": _id})
+        _id = request.query_params.get("id", "")
+        doc = CLIENT.bmo.optim.find_one({"_id": _id}) or {}
         flags["formula"] = doc.get("formula", "")
         flags["objective"] = doc.get("objective", "")
         flags["initial_point"] = doc.get("initial_point", {})
         flags["coefs"] = doc.get("coefs", {})
         flags["closest_solution"] = doc.get("closest_solution", {})
-    except Exception:
-        pass
+    except pymongo.errors.ServerSelectionTimeoutError as error:
+        return templates.TemplateResponse(
+            "500.html",
+            {"request": request, "error": "the database seems down: %s" % error},
+        )
     return templates.TemplateResponse(
         "index.html", {"request": request, "flags": flags}
     )

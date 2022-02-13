@@ -1,7 +1,7 @@
 { "name": "Business Model Optimizer" 
 , "short_name": "BMO"
 , "background_color": "#2A2C2B"
-, "themeColor": "#2A2C2B"
+, "theme_color": "#2A2C2B"
 , "description": "Découvrez le chemin le plus court vers votre objectif de rentabilité"
 , "dir": "ltr"
 , "lang": "fr"

@@ -1,4 +1,4 @@
-module Main exposing (main)
+module Pages.App exposing (Model, Msg, page)
 
 import Browser exposing (Document, UrlRequest, application)
 import Browser.Navigation as Nav
@@ -10,51 +10,44 @@ import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
+import Gen.Params.App exposing (Params)
+import Gen.Route exposing (Route(..))
 import Html exposing (Html)
 import Html.Events exposing (onInput)
 import Http
 import Json.Decode as Decode
+import Optim exposing (..)
+import Page
 import Process
+import Request exposing (Request)
 import Result
 import Round
 import Route exposing (Route)
 import Set
+import Shared
 import Task
 import Tuple exposing (first, second)
 import Url exposing (Url)
 import Url.Builder as UrlBuilder
 import Url.Parser as Parser exposing (Parser)
 import Url.Parser.Query as Query
+import View exposing (View)
+
+
+page : Shared.Model -> Request.With Params -> Page.With Model Msg
+page shared req =
+    Page.element
+        { init = init shared req
+        , update = update req
+        , view = view
+        , subscriptions = subscriptions
+        }
 
 
 
 -----------
 -- TYPES --
 -----------
-
-
-type Variable
-    = Variable String String
-
-
-type Coef
-    = Coef String Float
-
-
-type alias Point =
-    List Variable
-
-
-type alias Coefs =
-    List Coef
-
-
-type alias Host =
-    String
-
-
-type alias Formula =
-    String
 
 
 type alias Objective =
@@ -66,12 +59,9 @@ type alias Model =
     , initialPoint : Point
     , coefs : Coefs
     , nearestPoint : Point
-    , host : Host
     , debouncer : Debouncer Msg
     , spinnerV : Bool
     , spinnerR : Bool
-    , navkey : Nav.Key
-    , route : Route
     , error : Maybe String
     , dropdownState : Dropdown.State Objective
     , selectedObjective : Maybe Objective
@@ -87,26 +77,8 @@ type Msg
     | GetResult
     | GotResult (Result Http.Error OptimizationResult)
     | Delay (Debouncer.Msg Msg)
-    | LinkClicked UrlRequest
-    | UrlChanged Url
     | OptionPicked (Maybe Objective)
     | DropdownMsg (Dropdown.Msg Objective)
-
-
-type alias OptimizationResult =
-    { point : Point
-    , id : Maybe String
-    }
-
-
-type alias Flags =
-    { host : Host
-    , formula : Formula
-    , initialPoint : Point
-    , coefs : Coefs
-
-    --    , closest_solution : Point
-    }
 
 
 
@@ -130,23 +102,14 @@ initialVariableParser variable =
     Parser.query <| Query.string variable
 
 
-
--- TODO : deduce host from url??
-
-
-init : Decode.Value -> Url -> Nav.Key -> ( Model, Cmd Msg )
-init value url key =
+init : Shared.Model -> Request.With Params -> ( Model, Cmd Msg )
+init shared req =
     let
         formula =
-            Parser.parse formulaParser url |> Maybe.withDefault Nothing |> Maybe.withDefault ""
+            Dict.get "formula" req.query |> Maybe.withDefault ""
 
-        flags =
-            case Decode.decodeValue flagsDecoder value of
-                Ok f ->
-                    f
-
-                Err error ->
-                    { host = "", formula = "", initialPoint = [], coefs = [] }
+        initval =
+            shared.initval
 
         model =
             { formula =
@@ -154,11 +117,10 @@ init value url key =
                     formula
 
                 else
-                    flags.formula
-            , initialPoint = flags.initialPoint
-            , coefs = flags.coefs
+                    initval.formula
+            , initialPoint = initval.initialPoint
+            , coefs = initval.coefs
             , nearestPoint = []
-            , host = flags.host
             , debouncer = Debouncer.manual |> Debouncer.settleWhenQuietFor (Just <| Debouncer.fromSeconds 1.5) |> Debouncer.toDebouncer
             , spinnerV =
                 if formula /= "" then
@@ -167,13 +129,11 @@ init value url key =
                 else
                     False
             , spinnerR =
-                if isFilled flags.initialPoint then
+                if isFilled initval.initialPoint then
                     True
 
                 else
                     False
-            , route = Route.parseUrl url
-            , navkey = key
             , error = Nothing
             , dropdownState = Dropdown.init "Select your objective"
             , selectedObjective = Nothing
@@ -265,8 +225,8 @@ updateDebouncer =
     }
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update : Request.With Params -> Msg -> Model -> ( Model, Cmd Msg )
+update req msg model =
     case msg of
         FormulaChanged inputstring ->
             ( { model
@@ -290,7 +250,12 @@ update msg model =
             )
 
         GetVariables ->
-            ( { model | spinnerV = True }, Cmd.batch [ getVariables model, Nav.replaceUrl model.navkey <| buildFormulaUrl model ] )
+            ( { model | spinnerV = True }
+            , Cmd.batch
+                [ getVariables req model
+                , Nav.replaceUrl req.key <| buildFormulaUrl model
+                ]
+            )
 
         InitialValueChanged name value ->
             let
@@ -342,7 +307,7 @@ update msg model =
                     in
                     ( { model | initialPoint = newpoint, nearestPoint = [], spinnerV = False }
                     , if isFilled newpoint then
-                        getResult model
+                        getResult req model
 
                       else
                         Cmd.none
@@ -364,13 +329,13 @@ update msg model =
                     )
 
         GetResult ->
-            ( { model | spinnerR = True }, getResult model )
+            ( { model | spinnerR = True }, getResult req model )
 
         GotResult optresult ->
             case optresult of
                 Ok result ->
                     ( { model | nearestPoint = result.point, spinnerR = False }
-                    , Nav.replaceUrl model.navkey <| buildIdUrl model result
+                    , Nav.replaceUrl req.key <| buildIdUrl model result
                     )
 
                 Err error ->
@@ -388,20 +353,7 @@ update msg model =
                     )
 
         Delay subMsg ->
-            Debouncer.update update updateDebouncer subMsg model
-
-        UrlChanged url ->
-            ( { model | route = Route.parseUrl url }
-            , Cmd.none
-            )
-
-        LinkClicked urlrequest ->
-            case urlrequest of
-                Browser.Internal url ->
-                    ( model, Nav.pushUrl model.navkey (Url.toString url) )
-
-                Browser.External href ->
-                    ( model, Nav.load href )
+            Debouncer.update (update req) updateDebouncer subMsg model
 
         CoefChanged name coef ->
             let
@@ -486,12 +438,12 @@ updatePoint newpoint point =
 
 buildFormulaUrl : Model -> String
 buildFormulaUrl model =
-    UrlBuilder.absolute [] [ UrlBuilder.string "formula" model.formula ]
+    UrlBuilder.absolute [ "app" ] [ UrlBuilder.string "formula" model.formula ]
 
 
 buildIdUrl : Model -> OptimizationResult -> String
 buildIdUrl model result =
-    Maybe.withDefault (buildFormulaUrl model) result.id
+    result.id |> Maybe.map (\i -> UrlBuilder.absolute [ "app" ] [ UrlBuilder.string "id" i ]) |> Maybe.withDefault (buildFormulaUrl model)
 
 
 
@@ -535,96 +487,38 @@ queryObjective objective =
             [ UrlBuilder.string "objective" o ]
 
 
-getVariables : Model -> Cmd Msg
-getVariables model =
+getVariables : Request.With Params -> Model -> Cmd Msg
+getVariables req model =
     Http.get
-        { url = model.host ++ queryFormula model.formula
+        { url = queryFormula model.formula
         , expect = Http.expectJson GotVariables resultDecoder
         }
 
 
-getResult : Model -> Cmd Msg
-getResult model =
+getResult : Request.With Params -> Model -> Cmd Msg
+getResult req model =
     Http.get
-        { url = model.host ++ queryResult model.formula model.initialPoint model.coefs model.selectedObjective
+        { url = queryResult model.formula model.initialPoint model.coefs model.selectedObjective
         , expect = Http.expectJson GotResult resultDecoder
         }
 
 
-pointDecoder : Decode.Decoder Point
-pointDecoder =
-    Decode.dict (Decode.maybe Decode.float)
-        |> Decode.andThen
-            (\dict ->
-                Decode.succeed
-                    (Dict.toList dict
-                        |> List.map
-                            (\( k, v ) -> Variable k (Maybe.withDefault "" <| Maybe.map String.fromFloat v))
-                    )
-            )
 
-
-coefsDecoder : Decode.Decoder Coefs
-coefsDecoder =
-    Decode.dict (Decode.maybe Decode.float)
-        |> Decode.andThen
-            (\dict ->
-                Decode.succeed
-                    (Dict.toList dict
-                        |> List.map
-                            (\( k, v ) -> Coef k (Maybe.withDefault 1.0 v))
-                    )
-            )
-
-
-resultDecoder : Decode.Decoder OptimizationResult
-resultDecoder =
-    Decode.field "status" Decode.string
-        |> Decode.andThen
-            (\s ->
-                if s == "success" then
-                    Decode.map2 OptimizationResult
-                        (Decode.field "point" pointDecoder)
-                        (Decode.field "id" (Decode.maybe Decode.string))
-
-                else
-                    Decode.fail s
-            )
-
-
-flagsDecoder : Decode.Decoder Flags
-flagsDecoder =
-    Decode.map4 Flags
-        (Decode.field "host" Decode.string)
-        (Decode.field "formula" Decode.string)
-        (Decode.field "initial_point" pointDecoder)
-        (Decode.field "coefs" coefsDecoder)
-
-
-
---        (Decode.field "closest_solution" pointDecoder)
 -----------
 -- VIEWS --
 -----------
 
 
-view : Model -> Document Msg
+view : Model -> View Msg
 view model =
     { title = "BMO"
-    , body =
-        [ E.layout
-            [ Background.color (E.rgb255 42 44 43)
-            , Font.color (E.rgb255 217 203 158)
-            , E.paddingEach { top = 10, right = 0, bottom = 100, left = 0 }
+    , element =
+        E.column [ E.centerX, E.spacing 20, E.width <| E.maximum 700 E.fill ] <|
+            [ inputFormula model
+            , inputObjective model
+            , initialPoint model
+            , nearestPoint model
             ]
-          <|
-            E.column [ E.centerX, E.spacing 20, E.width <| E.maximum 700 E.fill ] <|
-                [ inputFormula model
-                , inputObjective model
-                , initialPoint model
-                , nearestPoint model
-                ]
-        ]
     }
 
 
@@ -633,7 +527,7 @@ inputFormula model =
     E.column (blockAttributes ++ [ E.paddingEach { blockEdges | top = 20 } ])
         [ E.row [ E.width E.fill ]
             [ E.link []
-                { url = String.replace "app" "www" model.host
+                { url = "/"
                 , label = E.text "← Back to home page"
                 }
             ]
@@ -663,7 +557,7 @@ inputObjective model =
         ]
 
 
-placeholder : Model -> Maybe (Input.Placeholder msg)
+placeholder : Model -> Maybe (Input.Placeholder Msg)
 placeholder model =
     Just <|
         Input.placeholder []
@@ -678,7 +572,7 @@ placeholder model =
 
 spinnerImage : E.Element Msg
 spinnerImage =
-    E.image [] { src = "/static/spinner.png", description = "spinner" }
+    E.image [] { src = "/public/spinner.png", description = "spinner" }
 
 
 blockEdges =
@@ -887,33 +781,6 @@ viewError model =
 ------------------------
 
 
-subscriptions : Model -> Sub msg
+subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.none
-
-
-onurlrequest : UrlRequest -> Msg
-onurlrequest =
-    LinkClicked
-
-
-onurlchange : Url -> Msg
-onurlchange =
-    UrlChanged
-
-
-
-----------
--- MAIN --
-----------
-
-
-main =
-    Browser.application
-        { init = init
-        , view = view
-        , update = update
-        , subscriptions = subscriptions
-        , onUrlRequest = onurlrequest
-        , onUrlChange = onurlchange
-        }

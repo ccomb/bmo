@@ -1,6 +1,10 @@
-__pycache__/
-elm-stuff/
 .*.swp
-static/app.js
-mongo.password
+.DS_Store
+.elm-spa
+src/__pycache__/
 deploy.prod.sh
+dist
+elm-stuff/
+mongo.password
+node_modules
+public/app.js
