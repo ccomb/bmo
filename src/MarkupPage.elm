@@ -88,7 +88,7 @@ loadingPage : View Msg
 loadingPage =
     { title = "Loading"
     , attributes = []
-    , element = E.text "Loading"
+    , element = E.el [ E.centerX, E.centerY ] <| E.image [] { src = "/public/bspinner.png", description = "spinner" }
     }
 
 
