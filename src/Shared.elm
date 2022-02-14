@@ -8,8 +8,9 @@ module Shared exposing
     , update
     )
 
+import Browser.Events as Events
 import Json.Decode as Json
-import Optim exposing (..)
+import Optim exposing (Coefs, Formula, Point, coefsDecoder, pointDecoder)
 import Request exposing (Request)
 
 
@@ -18,7 +19,9 @@ type alias Flags =
 
 
 type alias WindowSize =
-    { w : Int, h : Int }
+    { w : Int
+    , h : Int
+    }
 
 
 type alias Model =
@@ -45,14 +48,14 @@ type Msg
 
 
 init : Request -> Json.Value -> ( Model, Cmd Msg )
-init req flags =
+init _ flags =
     let
         model =
             case Json.decodeValue flagsDecoder flags of
                 Ok m ->
                     m
 
-                Err error ->
+                Err _ ->
                     { formula = ""
                     , initialPoint = []
                     , coefs = []
@@ -73,4 +76,4 @@ update _ msg model =
 
 subscriptions : Request -> Model -> Sub Msg
 subscriptions _ _ =
-    Sub.none
+    Events.onResize (\width height -> WindowResized (WindowSize width height))

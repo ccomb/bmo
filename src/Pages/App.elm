@@ -1,6 +1,5 @@
 module Pages.App exposing (Model, Msg, page)
 
-import Browser exposing (Document, UrlRequest, application)
 import Browser.Navigation as Nav
 import Debouncer.Messages as Debouncer exposing (Debouncer)
 import Dict
@@ -12,25 +11,14 @@ import Element.Font as Font
 import Element.Input as Input
 import Gen.Params.App exposing (Params)
 import Gen.Route exposing (Route(..))
-import Html exposing (Html)
-import Html.Events exposing (onInput)
 import Http
-import Json.Decode as Decode
-import Optim exposing (..)
+import Optim exposing (Coef(..), Coefs, Formula, OptimizationResult, Point, Variable(..), resultDecoder)
 import Page
-import Process
-import Request exposing (Request)
-import Result
+import Request
 import Round
-import Route exposing (Route)
-import Set
 import Shared
 import Task
-import Tuple exposing (first, second)
-import Url exposing (Url)
 import Url.Builder as UrlBuilder
-import Url.Parser as Parser exposing (Parser)
-import Url.Parser.Query as Query
 import View exposing (View)
 
 
@@ -73,7 +61,7 @@ type Msg
     | GetVariables
     | GotVariables (Result Http.Error OptimizationResult)
     | InitialValueChanged String String
-    | CoefChanged String Float
+      --    | CoefChanged String Float
     | GetResult
     | GotResult (Result Http.Error OptimizationResult)
     | Delay (Debouncer.Msg Msg)
@@ -90,16 +78,6 @@ type Msg
 defaultPlaceholder : String
 defaultPlaceholder =
     ""
-
-
-formulaParser : Parser (Maybe Formula -> a) a
-formulaParser =
-    Parser.query <| Query.string "formula"
-
-
-initialVariableParser : String -> Parser (Maybe String -> a) a
-initialVariableParser variable =
-    Parser.query <| Query.string variable
 
 
 init : Shared.Model -> Request.With Params -> ( Model, Cmd Msg )
@@ -119,18 +97,8 @@ init shared req =
             , coefs = shared.coefs
             , nearestPoint = []
             , debouncer = Debouncer.manual |> Debouncer.settleWhenQuietFor (Just <| Debouncer.fromSeconds 1.5) |> Debouncer.toDebouncer
-            , spinnerV =
-                if formula /= "" then
-                    True
-
-                else
-                    False
-            , spinnerR =
-                if isFilled shared.initialPoint then
-                    True
-
-                else
-                    False
+            , spinnerV = formula /= ""
+            , spinnerR = isFilled shared.initialPoint
             , error = Nothing
             , dropdownState = Dropdown.init "Select your objective"
             , selectedObjective = Nothing
@@ -144,7 +112,7 @@ init shared req =
 
 pointToNames : Point -> List String
 pointToNames point =
-    List.map (\(Variable n v) -> n) point
+    List.map (\(Variable n _) -> n) point
 
 
 dropdownConfig : Model -> Dropdown.Config Objective Msg Model
@@ -249,7 +217,7 @@ update req msg model =
         GetVariables ->
             ( { model | spinnerV = True }
             , Cmd.batch
-                [ getVariables req model
+                [ getVariables model
                 , Nav.replaceUrl req.key <| buildFormulaUrl model
                 ]
             )
@@ -270,7 +238,7 @@ update req msg model =
                 newcoefs =
                     if
                         List.foldl
-                            (\(Coef n v) b ->
+                            (\(Coef n _) b ->
                                 if name == n then
                                     True
 
@@ -304,7 +272,7 @@ update req msg model =
                     in
                     ( { model | initialPoint = newpoint, nearestPoint = [], spinnerV = False }
                     , if isFilled newpoint then
-                        getResult req model
+                        getResult model
 
                       else
                         Cmd.none
@@ -326,7 +294,7 @@ update req msg model =
                     )
 
         GetResult ->
-            ( { model | spinnerR = True }, getResult req model )
+            ( { model | spinnerR = True }, getResult model )
 
         GotResult optresult ->
             case optresult of
@@ -352,29 +320,28 @@ update req msg model =
         Delay subMsg ->
             Debouncer.update (update req) updateDebouncer subMsg model
 
-        CoefChanged name coef ->
-            let
-                newcoefs =
-                    List.map
-                        (\(Coef n v) ->
-                            if name == n then
-                                Coef n coef
-
-                            else
-                                Coef n v
-                        )
-                        model.coefs
-            in
-            if isFilled model.initialPoint then
-                ( { model | coefs = newcoefs, spinnerR = True }
-                , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
-                )
-
-            else
-                ( { model | coefs = newcoefs, nearestPoint = [] }
-                , Cmd.none
-                )
-
+        --        CoefChanged name coef ->
+        --            let
+        --                newcoefs =
+        --                    List.map
+        --                        (\(Coef n v) ->
+        --                            if name == n then
+        --                                Coef n coef
+        --
+        --                            else
+        --                                Coef n v
+        --                        )
+        --                        model.coefs
+        --            in
+        --            if isFilled model.initialPoint then
+        --                ( { model | coefs = newcoefs, spinnerR = True }
+        --                , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
+        --                )
+        --
+        --            else
+        --                ( { model | coefs = newcoefs, nearestPoint = [] }
+        --                , Cmd.none
+        --                )
         OptionPicked option ->
             ( { model | selectedObjective = option }
             , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
@@ -405,7 +372,7 @@ isFilled point =
 
     else
         List.all
-            (\(Variable n v) ->
+            (\(Variable _ v) ->
                 String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
             )
             point
@@ -427,7 +394,7 @@ updatePoint newpoint point =
     in
     newpoint
         |> List.map
-            (\(Variable k v) ->
+            (\(Variable k _) ->
                 Variable k
                     (Dict.get k existingvalues |> Maybe.withDefault "")
             )
@@ -457,8 +424,8 @@ queryFormula inputstring =
 queryResult : Formula -> Point -> Coefs -> Maybe Objective -> String
 queryResult inputstring point coefs objective =
     UrlBuilder.absolute [ "optimize" ]
-        ([ UrlBuilder.string "formula" inputstring ]
-            ++ List.map queryPoint point
+        (UrlBuilder.string "formula" inputstring
+            :: List.map queryPoint point
             ++ List.map queryCoef coefs
             ++ queryObjective objective
         )
@@ -484,16 +451,16 @@ queryObjective objective =
             [ UrlBuilder.string "objective" o ]
 
 
-getVariables : Request.With Params -> Model -> Cmd Msg
-getVariables req model =
+getVariables : Model -> Cmd Msg
+getVariables model =
     Http.get
         { url = queryFormula model.formula
         , expect = Http.expectJson GotVariables resultDecoder
         }
 
 
-getResult : Request.With Params -> Model -> Cmd Msg
-getResult req model =
+getResult : Model -> Cmd Msg
+getResult model =
     Http.get
         { url = queryResult model.formula model.initialPoint model.coefs model.selectedObjective
         , expect = Http.expectJson GotResult resultDecoder
@@ -509,6 +476,11 @@ getResult req model =
 view : Model -> View Msg
 view model =
     { title = "BMO"
+    , attributes =
+        [ Background.color (E.rgb255 42 44 43)
+        , Font.color (E.rgb255 217 203 158)
+        , E.paddingEach { top = 10, right = 0, bottom = 100, left = 0 }
+        ]
     , element =
         E.column [ E.centerX, E.spacing 20, E.width <| E.maximum 700 E.fill ] <|
             [ inputFormula model
@@ -572,6 +544,7 @@ spinnerImage =
     E.image [] { src = "/public/spinner.png", description = "spinner" }
 
 
+blockEdges : { top : Int, bottom : Int, left : Int, right : Int }
 blockEdges =
     { top = 20, bottom = 50, left = 50, right = 50 }
 
@@ -597,17 +570,17 @@ initialPoint model =
             newCoefs =
                 Dict.union
                     (model.coefs |> List.map (\(Coef n v) -> ( n, v )) |> Dict.fromList)
-                    (model.initialPoint |> List.map (\(Variable n v) -> ( "coef_" ++ n, 1.0 )) |> Dict.fromList)
+                    (model.initialPoint |> List.map (\(Variable n _) -> ( "coef_" ++ n, 1.0 )) |> Dict.fromList)
                     |> Dict.toList
                     |> List.map (\( n, v ) -> Coef n v)
 
             maxLabelSize =
-                Maybe.withDefault 0 <| List.maximum <| List.map (\(Variable n v) -> String.length n) model.initialPoint
+                Maybe.withDefault 0 <| List.maximum <| List.map (\(Variable n _) -> String.length n) model.initialPoint
         in
         E.column blockAttributes <|
             [ E.row [] [ E.text "Your current situation:" ] ]
                 ++ List.map2
-                    (\(Variable vn vv) (Coef cn cv) ->
+                    (\(Variable vn vv) _ ->
                         E.wrappedRow [ E.spacing 50 ]
                             [ E.el [ Font.family [ Font.monospace ] ] (E.text <| String.padRight maxLabelSize ' ' vn)
                             , inputValue (Variable vn vv)
@@ -635,33 +608,34 @@ inputValue (Variable name value) =
         }
 
 
-inputCoef : Coef -> E.Element Msg
-inputCoef (Coef name coef) =
-    Input.slider
-        [ E.height (E.px 30)
-        , E.behindContent
-            (E.el
-                [ E.width E.fill
-                , E.height (E.px 2)
-                , E.centerY
-                , Background.color (E.rgb255 150 150 150)
-                , Border.rounded 2
-                ]
-                E.none
-            )
-        ]
-        { onChange = CoefChanged name
-        , label = Input.labelAbove [] (E.text <| "Viscosity = " ++ Round.round 1 coef)
-        , min = 0.0
-        , max = 3.0
-        , step = Just 0.1
-        , value = coef
-        , thumb = Input.defaultThumb
-        }
+
+--inputCoef : Coef -> E.Element Msg
+--inputCoef (Coef name coef) =
+--    Input.slider
+--        [ E.height (E.px 30)
+--        , E.behindContent
+--            (E.el
+--                [ E.width E.fill
+--                , E.height (E.px 2)
+--                , E.centerY
+--                , Background.color (E.rgb255 150 150 150)
+--                , Border.rounded 2
+--                ]
+--                E.none
+--            )
+--        ]
+--        { onChange = CoefChanged name
+--        , label = Input.labelAbove [] (E.text <| "Viscosity = " ++ Round.round 1 coef)
+--        , min = 0.0
+--        , max = 3.0
+--        , step = Just 0.1
+--        , value = coef
+--        , thumb = Input.defaultThumb
+--        }
 
 
 displayValue : Variable -> E.Element Msg
-displayValue (Variable name value) =
+displayValue (Variable _ value) =
     E.text <|
         (value
             |> String.toFloat
@@ -671,7 +645,7 @@ displayValue (Variable name value) =
 
 
 variation : Variable -> Variable -> E.Element Msg
-variation (Variable initial_name initial_value) (Variable target_name target_value) =
+variation (Variable _ initial_value) (Variable target_name target_value) =
     case String.toFloat initial_value of
         Just initial ->
             case String.toFloat target_value of
@@ -719,11 +693,6 @@ variation (Variable initial_name initial_value) (Variable target_name target_val
             E.none
 
 
-neverFloat : Never -> Float
-neverFloat =
-    never
-
-
 nearestPoint : Model -> E.Element Msg
 nearestPoint model =
     if model.spinnerR then
@@ -749,16 +718,11 @@ nearestPoint model =
                         model.nearestPoint
 
     else
-        Maybe.map (\err -> E.column blockAttributes [ viewError model ]) model.error |> Maybe.withDefault E.none
+        Maybe.map (\err -> E.column blockAttributes [ viewError model err ]) model.error |> Maybe.withDefault E.none
 
 
-notfound : Model -> E.Element Msg
-notfound model =
-    E.el [] (E.text "Not Found")
-
-
-viewError : Model -> E.Element Msg
-viewError model =
+viewError : Model -> String -> E.Element Msg
+viewError model err =
     Maybe.map
         (\t ->
             E.paragraph
@@ -766,7 +730,7 @@ viewError model =
                 , Background.color (E.rgb255 255 255 255)
                 , E.padding 10
                 ]
-                [ E.text t ]
+                [ E.text <| t ++ " : " ++ err ]
         )
         model.error
         |> Maybe.withDefault E.none
@@ -779,5 +743,5 @@ viewError model =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.none

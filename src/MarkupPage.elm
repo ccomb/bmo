@@ -17,8 +17,163 @@ import Shared exposing (Model, WindowSize)
 import View exposing (View)
 
 
+type MarkupContent
+    = Loading
+    | Failed String
+    | Loaded String
 
+
+type alias Model =
+    { markup : MarkupContent }
+
+
+type Msg
+    = GotMarkup (Result Http.Error String)
+
+
+init : Request -> ( Model, Cmd Msg )
+init req =
+    ( { markup = Loading }
+    , Http.get
+        { url =
+            let
+                path =
+                    if req.url.path == "/" then
+                        "home_"
+
+                    else
+                        req.url.path
+            in
+            "/content/" ++ path
+        , expect = Http.expectString GotMarkup
+        }
+    )
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        GotMarkup result ->
+            case result of
+                Ok markup ->
+                    ( { model
+                        | markup = Loaded markup
+                      }
+                    , Cmd.none
+                    )
+
+                Err error ->
+                    -- TODO
+                    ( { model
+                        | markup = Failed "Could not load the content"
+                      }
+                    , Cmd.none
+                    )
+
+
+view : Shared.Model -> Request -> Model -> View Msg
+view shared _ model =
+    case model.markup of
+        Loading ->
+            loadingPage
+
+        Failed error ->
+            errorPage error
+
+        Loaded content ->
+            markupview shared model content
+
+
+loadingPage : View Msg
+loadingPage =
+    { title = "Loading"
+    , attributes = []
+    , element = E.text "Loading"
+    }
+
+
+errorPage : String -> View Msg
+errorPage error =
+    { title = "Error"
+    , attributes = []
+    , element = E.text <| "Error: " ++ error
+    }
+
+
+markupview : Shared.Model -> Model -> String -> View msg
+markupview shared model content =
+    case Mark.compile (document shared model) content of
+        Mark.Success element ->
+            { title = "Business Model Optimizer"
+            , attributes = []
+            , element = element
+            }
+
+        Mark.Almost { result, errors } ->
+            { title = "Warning"
+            , attributes = []
+            , element =
+                E.column [] <| viewErrors errors
+            }
+
+        Mark.Failure error ->
+            { title = "Failure"
+            , attributes = []
+            , element =
+                E.row
+                    [ E.centerX
+                    , E.centerY
+                    , Background.color (E.rgb255 240 240 240)
+                    , Border.rounded 10
+                    , E.padding 50
+                    , Border.shadow
+                        { color = E.rgb255 200 200 200
+                        , blur = 5
+                        , offset = ( 3, 3 )
+                        , size = 0.1
+                        }
+                    ]
+                    (viewErrors error)
+            }
+
+
+viewErrors : List Mark.Error.Error -> List (Element msg)
+viewErrors errors =
+    List.map (E.html << Mark.Error.toHtml Mark.Error.Light) errors
+
+
+
+--------
+-- TOOLS
+--------
+
+
+paddingAuto : WindowSize -> Int -> E.Attribute msg
+paddingAuto size =
+    -- automatic padding for the content width
+    E.paddingXY (size.w // 3 - 130)
+
+
+decodeColor : String -> E.Color
+decodeColor colorstring =
+    let
+        l =
+            String.split " " colorstring
+                |> List.map String.toFloat
+                |> List.map (Maybe.withDefault 100)
+                |> List.map ((*) 0.01)
+    in
+    E.rgba
+        (l |> List.head |> Maybe.withDefault 100)
+        (List.drop 1 l |> List.head |> Maybe.withDefault 100)
+        (List.drop 2 l |> List.head |> Maybe.withDefault 100)
+        (List.drop 3 l |> List.head |> Maybe.withDefault 100)
+
+
+
+--------------------------------------
 -- describe the accepted markup blocks
+--------------------------------------
 
 
 document : Shared.Model -> Model -> Mark.Document (E.Element msg)
@@ -49,33 +204,6 @@ document shared model =
             , footerBlock size
             ]
         )
-
-
-viewErrors : List Mark.Error.Error -> List (Element msg)
-viewErrors errors =
-    List.map (E.html << Mark.Error.toHtml Mark.Error.Light) errors
-
-
-paddingAuto : WindowSize -> Int -> E.Attribute msg
-paddingAuto size =
-    -- automatic padding for the content width
-    E.paddingXY (size.w // 3 - 130)
-
-
-decodeColor : String -> E.Color
-decodeColor colorstring =
-    let
-        l =
-            String.split " " colorstring
-                |> List.map String.toFloat
-                |> List.map (Maybe.withDefault 100)
-                |> List.map ((*) 0.01)
-    in
-    E.rgba
-        (l |> List.head |> Maybe.withDefault 100)
-        (List.drop 1 l |> List.head |> Maybe.withDefault 100)
-        (List.drop 2 l |> List.head |> Maybe.withDefault 100)
-        (List.drop 3 l |> List.head |> Maybe.withDefault 100)
 
 
 hero : WindowSize -> Mark.Block (E.Element msg)
@@ -219,7 +347,7 @@ cta =
 
 image =
     Mark.annotation "img"
-        (\styles src width desc -> E.image [ E.width (E.px width) ] { src = src, description = desc })
+        (\_ src width desc -> E.image [ E.width (E.px width) ] { src = src, description = desc })
         |> Mark.field "src" Mark.string
         |> Mark.field "width" Mark.int
         |> Mark.field "desc" Mark.string
@@ -326,116 +454,6 @@ renderItem size (Mark.Item item) =
         ]
 
 
-type MarkupContent
-    = Loading
-    | Failed String
-    | Loaded String
-
-
-type alias Model =
-    { markup : MarkupContent }
-
-
-type Msg
-    = GotMarkup (Result Http.Error String)
-
-
-init : Shared.Model -> Request -> ( Model, Cmd Msg )
-init shared req =
-    ( { markup = Loading }
-    , Http.get
-        { url =
-            let
-                path =
-                    if req.url.path == "/" then
-                        "home_"
-
-                    else
-                        req.url.path
-            in
-            "/content/" ++ path
-        , expect = Http.expectString GotMarkup
-        }
-    )
-
-
-update : Shared.Model -> Request -> Msg -> Model -> ( Model, Cmd Msg )
-update shared req msg model =
-    case msg of
-        GotMarkup result ->
-            case result of
-                Ok markup ->
-                    ( { model
-                        | markup = Loaded markup
-                      }
-                    , Cmd.none
-                    )
-
-                Err error ->
-                    ( { model
-                        | markup = Failed "Could not load the content"
-                      }
-                    , Cmd.none
-                    )
-
-
-view : Shared.Model -> Request -> Model -> View Msg
-view shared req model =
-    case model.markup of
-        Loading ->
-            loadingPage
-
-        Failed error ->
-            errorPage error
-
-        Loaded content ->
-            markupview shared model content
-
-
-loadingPage : View Msg
-loadingPage =
-    { title = "Loading", element = E.text "Loading" }
-
-
-errorPage : String -> View Msg
-errorPage error =
-    { title = "Error", element = E.text <| "Error: " ++ error }
-
-
-markupview : Shared.Model -> Model -> String -> View msg
-markupview shared model content =
-    case Mark.compile (document shared model) content of
-        Mark.Success element ->
-            { title = "Business Model Optimizer"
-            , element = element
-            }
-
-        Mark.Almost { result, errors } ->
-            { title = "Warning"
-            , element =
-                E.column [] <| viewErrors errors
-            }
-
-        Mark.Failure error ->
-            { title = "Failure"
-            , element =
-                E.row
-                    [ E.centerX
-                    , E.centerY
-                    , Background.color (E.rgb255 240 240 240)
-                    , Border.rounded 10
-                    , E.padding 50
-                    , Border.shadow
-                        { color = E.rgb255 200 200 200
-                        , blur = 5
-                        , offset = ( 3, 3 )
-                        , size = 0.1
-                        }
-                    ]
-                    (viewErrors error)
-            }
-
-
 footerBlock : WindowSize -> Mark.Block (E.Element msg)
 footerBlock size =
     Mark.record "Footer"
@@ -478,5 +496,5 @@ renderInlineItem (Mark.Item item) =
 
 
 subscriptions : Model -> Sub Msg
-subscriptions model =
+subscriptions _ =
     Sub.none

@@ -5,7 +5,6 @@ import MarkupPage
 import Page
 import Request
 import Shared
-import View exposing (View)
 
 
 type alias Msg =
@@ -19,8 +18,8 @@ type alias Model =
 page : Shared.Model -> Request.With Params -> Page.With Model Msg
 page shared req =
     Page.element
-        { init = MarkupPage.init shared req
-        , update = MarkupPage.update shared req
+        { init = MarkupPage.init req
+        , update = MarkupPage.update
         , view = MarkupPage.view shared req
         , subscriptions = MarkupPage.subscriptions
         }
