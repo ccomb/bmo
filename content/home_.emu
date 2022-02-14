@@ -1,6 +1,6 @@
 |> hero
     backgroundColor = 80 80 70
-    image= /hero.jpg
+    image= /public/hero.jpg
     textColor = 100 100 100 90
     titleBackground = 0 0 0 60
     title = Découvrez le chemin le plus court vers votre objectif de rentabilité.
@@ -144,7 +144,7 @@ C'est donc une aide à la décision : ça ne remplace pas votre propre analyse m
     height = 200
     links =
         |> Tree
-            - [Anybox]{img|src=/anybox.png, width=200 , desc=Anybox }
+            - [Anybox]{img|src=/public/anybox.png, width=200 , desc=Anybox }
             - [Innovation web]{ link | url=https://www.anybox.fr/comment-developper-un-produit-numerique}
             - [IA, Machine Learning]{ link | url=https://www.anybox.fr/contactus?name=Machine%20Learning}
             - [DevOps]{ link | url=https://www.anybox.fr/devops}

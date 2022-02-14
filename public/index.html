@@ -12,7 +12,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/public/bmo180.png">
     
     <title>Business Model Optimizer</title>
-
+    <link rel="stylesheet" href="/public/style.css">
 </head>
 <body>
     <noscript>
@@ -20,8 +20,10 @@
     </noscript>
     <script src="/public/dist/elm.js"></script>
     <script>
+    var flags = {{flags|tojson|safe}};
+    flags.window_size = {w: window.innerWidth, h: window.innerHeight};
     var app = Elm.Main.init({
-        flags: {{flags|tojson|safe}}
+        flags: flags
     });
     </script>
 </body>

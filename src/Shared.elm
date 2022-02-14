@@ -38,7 +38,7 @@ flagsDecoder =
         (Json.field "formula" Json.string)
         (Json.field "initial_point" pointDecoder)
         (Json.field "coefs" coefsDecoder)
-        (Json.field "windowSize"
+        (Json.field "window_size"
             (Json.map2 WindowSize (Json.field "w" Json.int) (Json.field "h" Json.int))
         )
 
