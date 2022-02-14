@@ -2,6 +2,7 @@ module Shared exposing
     ( Flags
     , Model
     , Msg
+    , WindowSize
     , init
     , subscriptions
     , update
@@ -16,50 +17,58 @@ type alias Flags =
     Json.Value
 
 
-type alias Initval =
-    { formula : Formula
-    , initialPoint : Point
-    , coefs : Coefs
-
-    --    , closest_solution : Point
-    }
-
-
-flagsDecoder : Json.Decoder Initval
-flagsDecoder =
-    Json.map3 Initval
-        (Json.field "formula" Json.string)
-        (Json.field "initial_point" pointDecoder)
-        (Json.field "coefs" coefsDecoder)
+type alias WindowSize =
+    { w : Int, h : Int }
 
 
 type alias Model =
-    { initval : Initval }
+    { formula : Formula
+    , initialPoint : Point
+    , coefs : Coefs
+    , windowSize : WindowSize
+    }
+
+
+flagsDecoder : Json.Decoder Model
+flagsDecoder =
+    Json.map4 Model
+        (Json.field "formula" Json.string)
+        (Json.field "initial_point" pointDecoder)
+        (Json.field "coefs" coefsDecoder)
+        (Json.field "windowSize"
+            (Json.map2 WindowSize (Json.field "w" Json.int) (Json.field "h" Json.int))
+        )
 
 
 type Msg
-    = NoOp
+    = WindowResized WindowSize
 
 
 init : Request -> Json.Value -> ( Model, Cmd Msg )
 init req flags =
     let
-        initval =
+        model =
             case Json.decodeValue flagsDecoder flags of
-                Ok f ->
-                    f
+                Ok m ->
+                    m
 
                 Err error ->
-                    { formula = "", initialPoint = [], coefs = [] }
+                    { formula = ""
+                    , initialPoint = []
+                    , coefs = []
+                    , windowSize = WindowSize 1024 768
+                    }
     in
-    ( { initval = initval }, Cmd.none )
+    ( model
+    , Cmd.none
+    )
 
 
 update : Request -> Msg -> Model -> ( Model, Cmd Msg )
 update _ msg model =
     case msg of
-        NoOp ->
-            ( model, Cmd.none )
+        WindowResized size ->
+            ( { model | windowSize = size }, Cmd.none )
 
 
 subscriptions : Request -> Model -> Sub Msg

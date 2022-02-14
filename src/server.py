@@ -2,7 +2,7 @@
 
 from collections import OrderedDict
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from hashlib import sha1
@@ -108,6 +108,19 @@ async def optimize(request: Request, formula: str = "", objective: str = ""):
         "status": "success",
         "point": closest_solution,
     }
+
+
+# serve markup content
+@api.get("/content/{page}", response_class=PlainTextResponse)
+async def content(request: Request, page: str):
+    try:
+        segments = page.split(os.path.sep)
+        if ".." in segments or len(segments) > 2:
+            raise Exception("Forbidden")
+        with open(os.path.join(os.path.pardir, "content", page + ".emu")) as f:
+            return PlainTextResponse(status_code=200, content=f.read())
+    except Exception as e:
+        return PlainTextResponse(status_code=404, content="NotFound: " + e)
 
 
 # Redirect everything else to the frontend

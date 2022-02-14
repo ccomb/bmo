@@ -1,11 +1,26 @@
-module Pages.Home_ exposing (view)
+module Pages.Home_ exposing (Model, Msg, page)
 
-import Element as E exposing (Element)
+import Gen.Params.Home_ exposing (Params)
+import MarkupPage
+import Page
+import Request
+import Shared
 import View exposing (View)
 
 
-view : View msg
-view =
-    { title = "Homepage"
-    , element = E.el [] <| E.column [] [ E.text "Hello, world!", E.link [] { url = "app", label = E.text "App" } ]
-    }
+type alias Msg =
+    MarkupPage.Msg
+
+
+type alias Model =
+    MarkupPage.Model
+
+
+page : Shared.Model -> Request.With Params -> Page.With Model Msg
+page shared req =
+    Page.element
+        { init = MarkupPage.init shared req
+        , update = MarkupPage.update shared req
+        , view = MarkupPage.view shared req
+        , subscriptions = MarkupPage.subscriptions
+        }

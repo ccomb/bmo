@@ -108,18 +108,15 @@ init shared req =
         formula =
             Dict.get "formula" req.query |> Maybe.withDefault ""
 
-        initval =
-            shared.initval
-
         model =
             { formula =
                 if formula /= "" then
                     formula
 
                 else
-                    initval.formula
-            , initialPoint = initval.initialPoint
-            , coefs = initval.coefs
+                    shared.formula
+            , initialPoint = shared.initialPoint
+            , coefs = shared.coefs
             , nearestPoint = []
             , debouncer = Debouncer.manual |> Debouncer.settleWhenQuietFor (Just <| Debouncer.fromSeconds 1.5) |> Debouncer.toDebouncer
             , spinnerV =
@@ -129,7 +126,7 @@ init shared req =
                 else
                     False
             , spinnerR =
-                if isFilled initval.initialPoint then
+                if isFilled shared.initialPoint then
                     True
 
                 else
