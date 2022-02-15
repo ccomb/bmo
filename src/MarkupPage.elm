@@ -15,7 +15,7 @@ import Maybe
 import Request exposing (Request)
 import Result exposing (Result)
 import Set exposing (Set)
-import Shared exposing (Model, WindowSize)
+import Shared exposing (WindowSize)
 import View exposing (View)
 
 
