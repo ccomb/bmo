@@ -162,7 +162,6 @@ Nous aidons déjà des startups et des organisations internationales de toutes t
 |> Footer
     background = 20 50 20
     color = 90 90 90
-    height = 200
     links =
         |> Tree
             - [Anybox]{img|src=/public/anybox.png, width=200 , desc=Anybox }

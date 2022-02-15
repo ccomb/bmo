@@ -161,7 +161,7 @@ viewErrors errors =
 paddingAuto : WindowSize -> Int -> E.Attribute msg
 paddingAuto size =
     -- automatic padding for the content width
-    E.paddingXY (size.w // 3 - 130)
+    E.paddingXY (size.w // 3 - 120)
 
 
 decodeColor : String -> E.Color
@@ -231,7 +231,7 @@ hero size =
                 ]
                 [ E.column
                     [ E.centerX
-                    , E.width (E.px (max 400 (size.w // 2)))
+                    , E.width (E.px (max 375 (size.w // 2)))
                     , Background.color <| decodeColor titleBackground
                     , Font.color (decodeColor textColor)
                     , Border.rounded 15
@@ -488,11 +488,11 @@ renderItem size (Mark.Item item) =
 footerBlock : WindowSize -> Mark.Block (E.Element msg)
 footerBlock size =
     Mark.record "Footer"
-        (\background color height links ->
+        (\background color links ->
             E.el
-                [ E.height <| E.px height
-                , Background.color (decodeColor background)
+                [ Background.color (decodeColor background)
                 , Font.size 20
+                , E.paddingXY 20 20
                 , E.width E.fill
                 , Region.footer
                 , E.centerX
@@ -510,7 +510,6 @@ footerBlock size =
         )
         |> Mark.field "background" Mark.string
         |> Mark.field "color" Mark.string
-        |> Mark.field "height" Mark.int
         |> Mark.field "links" (Mark.tree "Tree" renderInlineTree textBlock)
         |> Mark.toBlock
 
