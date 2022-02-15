@@ -112,6 +112,10 @@ C'est à vous de jouer !
     Aidez-nous, répondez aux questions :
 
 |> iframe
+    name=Typeform
+    button=→ Ouvrir le bref sondage ←
+    color=90 90 90
+    bcolor=20 50 20
     src=https://christophecombelles.typeform.com/to/iiLyAAYc
     width=640
     height=510

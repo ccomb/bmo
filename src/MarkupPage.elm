@@ -4,6 +4,7 @@ import Element as E exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
+import Element.Input as Input
 import Element.Region as Region
 import Html
 import Html.Attributes
@@ -13,6 +14,7 @@ import Mark.Error
 import Maybe
 import Request exposing (Request)
 import Result exposing (Result)
+import Set exposing (Set)
 import Shared exposing (Model, WindowSize)
 import View exposing (View)
 
@@ -24,16 +26,21 @@ type MarkupContent
 
 
 type alias Model =
-    { markup : MarkupContent }
+    { markup : MarkupContent
+    , openIFrames : Set String
+    }
 
 
 type Msg
     = GotMarkup (Result Http.Error String)
+    | OpenedIFrame String
 
 
 init : Request -> ( Model, Cmd Msg )
 init req =
-    ( { markup = Loading }
+    ( { markup = Loading
+      , openIFrames = Set.empty
+      }
     , Http.get
         { url =
             let
@@ -70,6 +77,9 @@ update msg model =
                     , Cmd.none
                     )
 
+        OpenedIFrame name ->
+            ( { model | openIFrames = Set.insert name model.openIFrames }, Cmd.none )
+
 
 view : Shared.Model -> Request -> Model -> View Msg
 view shared _ model =
@@ -100,7 +110,7 @@ errorPage error =
     }
 
 
-markupview : Shared.Model -> Model -> String -> View msg
+markupview : Shared.Model -> Model -> String -> View Msg
 markupview shared model content =
     case Mark.compile (document shared model) content of
         Mark.Success element ->
@@ -110,14 +120,14 @@ markupview shared model content =
             }
 
         Mark.Almost { result, errors } ->
-            { title = "Warning"
+            { title = "BMO: Warning"
             , attributes = []
             , element =
                 E.column [] <| viewErrors errors
             }
 
         Mark.Failure error ->
-            { title = "Failure"
+            { title = "BMO: Failure"
             , attributes = []
             , element =
                 E.row
@@ -176,7 +186,7 @@ decodeColor colorstring =
 --------------------------------------
 
 
-document : Shared.Model -> Model -> Mark.Document (E.Element msg)
+document : Shared.Model -> Model -> Mark.Document (E.Element Msg)
 document shared model =
     let
         size =
@@ -199,7 +209,7 @@ document shared model =
             , Mark.map (E.paragraph [ E.spacing 10, paddingAuto size 0 ]) textBlock
             , ctaBlock size
             , imageBlock size
-            , iframeBlock size
+            , iframeBlock model size
             , treeBlock size
             , footerBlock size
             ]
@@ -277,25 +287,46 @@ imageBlock size =
         |> Mark.toBlock
 
 
-iframeBlock : WindowSize -> Mark.Block (E.Element msg)
-iframeBlock model =
+iframeBlock : Model -> WindowSize -> Mark.Block (E.Element Msg)
+iframeBlock model size =
     Mark.record "iframe"
-        (\src width height background ->
+        (\name button color bcolor src width height background ->
             E.el
                 [ E.width E.fill
-                , paddingAuto model 0
+                , paddingAuto size 0
                 , Background.color (decodeColor background)
                 ]
             <|
-                E.html <|
-                    Html.iframe
-                        [ Html.Attributes.width width
-                        , Html.Attributes.height height
-                        , Html.Attributes.src src
-                        , Html.Attributes.style "border" "none"
+                if Set.member name model.openIFrames then
+                    E.html <|
+                        Html.iframe
+                            [ Html.Attributes.width width
+                            , Html.Attributes.height height
+                            , Html.Attributes.src src
+                            , Html.Attributes.style "border" "none"
+                            ]
+                            []
+
+                else
+                    Input.button
+                        [ Background.color <| decodeColor bcolor
+                        , E.spacing 30
+                        , Font.color <| decodeColor color
+                        , E.paddingXY 20 10
+                        , Border.rounded 10
+                        , Border.shadow
+                            { color = E.rgb255 20 20 20
+                            , blur = 10
+                            , offset = ( 3, 3 )
+                            , size = 0.1
+                            }
                         ]
-                        []
+                        { onPress = Just (OpenedIFrame name), label = E.text button }
         )
+        |> Mark.field "name" Mark.string
+        |> Mark.field "button" Mark.string
+        |> Mark.field "color" Mark.string
+        |> Mark.field "bcolor" Mark.string
         |> Mark.field "src" Mark.string
         |> Mark.field "width" Mark.int
         |> Mark.field "height" Mark.int
