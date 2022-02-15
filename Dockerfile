@@ -35,6 +35,7 @@ RUN set -x; \
 
 COPY src/server.py /srv/src/server.py
 COPY public /srv/public
+COPY content /srv/content
 COPY --from=build /srv/public/dist/elm.js /srv/public/dist/
 WORKDIR /srv/src
 EXPOSE 8000
