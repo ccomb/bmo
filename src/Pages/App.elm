@@ -718,22 +718,17 @@ nearestPoint model =
                         model.nearestPoint
 
     else
-        Maybe.map (\err -> E.column blockAttributes [ viewError model err ]) model.error |> Maybe.withDefault E.none
+        Maybe.map (\err -> E.column blockAttributes [ viewError err ]) model.error |> Maybe.withDefault E.none
 
 
-viewError : Model -> String -> E.Element Msg
-viewError model err =
-    Maybe.map
-        (\t ->
-            E.paragraph
-                [ Font.color (E.rgb255 255 0 0)
-                , Background.color (E.rgb255 255 255 255)
-                , E.padding 10
-                ]
-                [ E.text <| t ++ " : " ++ err ]
-        )
-        model.error
-        |> Maybe.withDefault E.none
+viewError : String -> E.Element Msg
+viewError err =
+    E.paragraph
+        [ Font.color (E.rgb255 255 0 0)
+        , Background.color (E.rgb255 255 255 255)
+        , E.padding 10
+        ]
+        [ E.text err ]
 
 
 
