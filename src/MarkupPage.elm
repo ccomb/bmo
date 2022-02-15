@@ -338,7 +338,7 @@ link =
     Mark.annotation "link"
         (\styles url ->
             E.link
-                []
+                [ Font.extraBold ]
                 { label =
                     styles
                         |> List.map (\s -> E.el (fromMark (Tuple.first s)) (E.text <| Tuple.second s))

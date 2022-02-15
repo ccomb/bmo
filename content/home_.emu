@@ -144,6 +144,21 @@ Le calcul n'est pas trivial, il fait appel à un algorithme d'optimisation. Vous
 Le résultat obtenu ne tient évidemment pas compte de votre contexte, c'est avant tout un résultat mathématique, qui tend à trouver un chemin qui provoque le moins de changement possible.
 C'est donc une aide à la décision : ça ne remplace pas votre propre analyse mais la complète.
 
+|> H2
+    Vous avez une innovation à développer ?
+
+[Contactez-nous]{link|url=https://www.anybox.fr/contactus?name=Innovation} !
+Anybox la concrétise et la déploie sur le Cloud, en suivant des pratiques [agiles]{link|url=https://www.anybox.fr/agilite} et [DevOps]{link|url=https://www.anybox.fr/devops}.
+Nous aidons déjà des startups et des organisation internationales de toutes tailles.
+
+|> ctaBlock
+    url = https://www.anybox.fr/contactus?name=Innovation
+    text = Prenez rendez-vous !
+    background = 20 50 20
+    color = 90 90 90
+
+
+
 |> Footer
     background = 20 50 20
     color = 90 90 90
