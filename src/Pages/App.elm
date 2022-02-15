@@ -51,7 +51,8 @@ type alias Model =
     , spinnerV : Bool
     , spinnerR : Bool
     , error : Maybe String
-    , dropdownState : Dropdown.State Objective
+
+    --, dropdownState : Dropdown.State Objective
     , selectedObjective : Maybe Objective
     }
 
@@ -65,11 +66,11 @@ type Msg
     | GetResult
     | GotResult (Result Http.Error OptimizationResult)
     | Delay (Debouncer.Msg Msg)
-    | OptionPicked (Maybe Objective)
-    | DropdownMsg (Dropdown.Msg Objective)
 
 
 
+--| OptionPicked (Maybe Objective)
+--| DropdownMsg (Dropdown.Msg Objective)
 ----------
 -- INIT --
 ----------
@@ -100,7 +101,8 @@ init shared req =
             , spinnerV = formula /= ""
             , spinnerR = isFilled shared.initialPoint
             , error = Nothing
-            , dropdownState = Dropdown.init "Select your objective"
+
+            --, dropdownState = Dropdown.init "Select your objective"
             , selectedObjective = Nothing
             }
     in
@@ -115,68 +117,67 @@ pointToNames point =
     List.map (\(Variable n _) -> n) point
 
 
-dropdownConfig : Model -> Dropdown.Config Objective Msg Model
-dropdownConfig model =
-    let
-        containerAttrs =
-            [ E.width (E.px 300) ]
 
-        selectAttrs =
-            [ Border.width 1, Border.rounded 5, E.paddingXY 16 8, E.spacing 10, E.width E.fill ]
-
-        searchAttrs =
-            [ Border.width 0, E.padding 0 ]
-
-        listAttrs =
-            [ Border.width 1
-            , Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 5, bottomRight = 5 }
-            , E.width E.fill
-            , E.spacing 5
-            ]
-
-        itemToPrompt item =
-            E.text item
-
-        itemToElement selected highlighted i =
-            let
-                bgColor =
-                    if highlighted then
-                        E.rgb255 70 70 70
-
-                    else if selected then
-                        E.rgb255 80 80 80
-
-                    else
-                        E.rgb255 50 50 50
-            in
-            E.row
-                [ Background.color bgColor
-                , E.padding 8
-                , E.spacing 10
-                , E.width E.fill
-                ]
-                [ E.el [] (E.text "-")
-                , E.el [ Font.size 16 ] (E.text i)
-                ]
-    in
-    Dropdown.filterable
-        { itemsFromModel = always <| pointToNames model.initialPoint
-        , selectionFromModel = .selectedObjective
-        , dropdownMsg = DropdownMsg
-        , onSelectMsg = OptionPicked
-        , itemToPrompt = itemToPrompt
-        , itemToElement = itemToElement
-        , itemToText = identity
-        }
-        |> Dropdown.withContainerAttributes containerAttrs
-        |> Dropdown.withPromptElement (E.el [] (E.text "Select option"))
-        |> Dropdown.withFilterPlaceholder "Type for option"
-        |> Dropdown.withSelectAttributes selectAttrs
-        |> Dropdown.withListAttributes listAttrs
-        |> Dropdown.withSearchAttributes searchAttrs
-
-
-
+--dropdownConfig : Model -> Dropdown.Config Objective Msg Model
+--dropdownConfig model =
+--    let
+--        containerAttrs =
+--            [ E.width (E.px 300) ]
+--
+--        selectAttrs =
+--            [ Border.width 1, Border.rounded 5, E.paddingXY 16 8, E.spacing 10, E.width E.fill ]
+--
+--        searchAttrs =
+--            [ Border.width 0, E.padding 0 ]
+--
+--        listAttrs =
+--            [ Border.width 1
+--            , Border.roundEach { topLeft = 0, topRight = 0, bottomLeft = 5, bottomRight = 5 }
+--            , E.width E.fill
+--            , E.spacing 5
+--            ]
+--
+--        itemToPrompt item =
+--            E.text item
+--
+--        itemToElement selected highlighted i =
+--            let
+--                bgColor =
+--                    if highlighted then
+--                        E.rgb255 70 70 70
+--
+--                    else if selected then
+--                        E.rgb255 80 80 80
+--
+--                    else
+--                        E.rgb255 50 50 50
+--            in
+--            E.row
+--                [ Background.color bgColor
+--                , E.padding 8
+--                , E.spacing 10
+--                , E.width E.fill
+--                ]
+--                [ E.el [] (E.text "-")
+--                , E.el [ Font.size 16 ] (E.text i)
+--                ]
+--    in
+--    Dropdown.filterable
+--        { itemsFromModel = always <| pointToNames model.initialPoint
+--        , selectionFromModel = .selectedObjective
+--
+--        --, dropdownMsg = DropdownMsg
+--        --, onSelectMsg = OptionPicked
+--        , itemToPrompt = itemToPrompt
+--        , itemToElement = itemToElement
+--        , itemToText = identity
+--        }
+--        |> Dropdown.withContainerAttributes containerAttrs
+--        |> Dropdown.withPromptElement (E.el [] (E.text "Select option"))
+--        |> Dropdown.withFilterPlaceholder "Type for option"
+--        |> Dropdown.withSelectAttributes selectAttrs
+--        |> Dropdown.withListAttributes listAttrs
+--        |> Dropdown.withSearchAttributes searchAttrs
 ------------
 -- UPDATE --
 ------------
@@ -320,39 +321,40 @@ update req msg model =
         Delay subMsg ->
             Debouncer.update (update req) updateDebouncer subMsg model
 
-        --        CoefChanged name coef ->
-        --            let
-        --                newcoefs =
-        --                    List.map
-        --                        (\(Coef n v) ->
-        --                            if name == n then
-        --                                Coef n coef
-        --
-        --                            else
-        --                                Coef n v
-        --                        )
-        --                        model.coefs
-        --            in
-        --            if isFilled model.initialPoint then
-        --                ( { model | coefs = newcoefs, spinnerR = True }
-        --                , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
-        --                )
-        --
-        --            else
-        --                ( { model | coefs = newcoefs, nearestPoint = [] }
-        --                , Cmd.none
-        --                )
-        OptionPicked option ->
-            ( { model | selectedObjective = option }
-            , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
-            )
 
-        DropdownMsg subMsg ->
-            let
-                ( state, cmd ) =
-                    Dropdown.update (dropdownConfig model) subMsg model model.dropdownState
-            in
-            ( { model | dropdownState = state }, cmd )
+
+--        CoefChanged name coef ->
+--            let
+--                newcoefs =
+--                    List.map
+--                        (\(Coef n v) ->
+--                            if name == n then
+--                                Coef n coef
+--
+--                            else
+--                                Coef n v
+--                        )
+--                        model.coefs
+--            in
+--            if isFilled model.initialPoint then
+--                ( { model | coefs = newcoefs, spinnerR = True }
+--                , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
+--                )
+--
+--            else
+--                ( { model | coefs = newcoefs, nearestPoint = [] }
+--                , Cmd.none
+--                )
+--OptionPicked option ->
+--    ( { model | selectedObjective = option }
+--    , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
+--    )
+--DropdownMsg subMsg ->
+--    let
+--        ( state, cmd ) =
+--            Dropdown.update (dropdownConfig model) subMsg model model.dropdownState
+--    in
+--    ( { model | dropdownState = state }, cmd )
 
 
 httpErrorToString : Http.Error -> Maybe String
@@ -484,7 +486,8 @@ view model =
     , element =
         E.column [ E.centerX, E.spacing 20, E.width <| E.maximum 700 E.fill ] <|
             [ inputFormula model
-            , inputObjective model
+
+            --, inputObjective model
             , initialPoint model
             , nearestPoint model
             ]
@@ -515,15 +518,16 @@ inputFormula model =
         ]
 
 
-inputObjective : Model -> E.Element Msg
-inputObjective model =
-    E.column blockAttributes
-        [ E.row [] [ E.text "Select the variable corresponding to your goal" ]
-        , E.row []
-            [ Dropdown.view (dropdownConfig model) model model.dropdownState
-                |> E.el []
-            ]
-        ]
+
+--inputObjective : Model -> E.Element Msg
+--inputObjective model =
+--    E.column blockAttributes
+--        [ E.row [] [ E.text "Select the variable corresponding to your goal" ]
+--        , E.row []
+--            [ Dropdown.view (dropdownConfig model) model model.dropdownState
+--                |> E.el []
+--            ]
+--        ]
 
 
 placeholder : Model -> Maybe (Input.Placeholder Msg)
