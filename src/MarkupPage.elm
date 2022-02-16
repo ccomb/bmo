@@ -34,6 +34,7 @@ type alias Model =
 type Msg
     = GotMarkup (Result Http.Error String)
     | OpenedIFrame String
+    | ClosedIFrame String
 
 
 init : Request -> ( Model, Cmd Msg )
@@ -79,6 +80,9 @@ update msg model =
 
         OpenedIFrame name ->
             ( { model | openIFrames = Set.insert name model.openIFrames }, Cmd.none )
+
+        ClosedIFrame name ->
+            ( { model | openIFrames = Set.remove name model.openIFrames }, Cmd.none )
 
 
 view : Shared.Model -> Request -> Model -> View Msg
@@ -298,14 +302,33 @@ iframeBlock model size =
                 ]
             <|
                 if Set.member name model.openIFrames then
-                    E.html <|
-                        Html.iframe
-                            [ Html.Attributes.width width
-                            , Html.Attributes.height height
-                            , Html.Attributes.src src
-                            , Html.Attributes.style "border" "none"
+                    E.column []
+                        [ E.row [ E.alignRight ]
+                            [ Input.button
+                                [ Background.color <| decodeColor bcolor
+                                , E.spacing 30
+                                , Font.color <| decodeColor color
+                                , Font.bold
+                                , E.paddingXY 20 10
+                                , Border.rounded 10
+                                , Border.shadow
+                                    { color = E.rgb255 20 20 20
+                                    , blur = 10
+                                    , offset = ( 3, 3 )
+                                    , size = 0.1
+                                    }
+                                ]
+                                { onPress = Just (ClosedIFrame name), label = E.text "×" }
                             ]
-                            []
+                        , E.html <|
+                            Html.iframe
+                                [ Html.Attributes.width width
+                                , Html.Attributes.height height
+                                , Html.Attributes.src src
+                                , Html.Attributes.style "border" "none"
+                                ]
+                                []
+                        ]
 
                 else
                     Input.button
