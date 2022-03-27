@@ -1,21 +1,9 @@
-module Shared exposing
-    ( Flags
-    , Model
-    , Msg
-    , WindowSize
-    , init
-    , subscriptions
-    , update
-    )
+module Shared exposing (Flags, Model, Msg, WindowSize, identity, init, subscriptions, update)
 
 import Browser.Events as Events
+import Browser.Navigation as Nav
 import Json.Decode as Json
 import Optim exposing (Coefs, Formula, Point, coefsDecoder, pointDecoder)
-import Request exposing (Request)
-
-
-type alias Flags =
-    Json.Value
 
 
 type alias WindowSize =
@@ -24,7 +12,7 @@ type alias WindowSize =
     }
 
 
-type alias Model =
+type alias Flags =
     { formula : Formula
     , initialPoint : Point
     , coefs : Coefs
@@ -32,9 +20,24 @@ type alias Model =
     }
 
 
-flagsDecoder : Json.Decoder Model
+type alias Model =
+    { key : Nav.Key
+    , identity : Maybe String
+    , formula : Formula
+    , initialPoint : Point
+    , coefs : Coefs
+    , windowSize : WindowSize
+    }
+
+
+identity : Model -> Maybe String
+identity =
+    .identity
+
+
+flagsDecoder : Json.Decoder Flags
 flagsDecoder =
-    Json.map4 Model
+    Json.map4 Flags
         (Json.field "formula" Json.string)
         (Json.field "initial_point" pointDecoder)
         (Json.field "coefs" coefsDecoder)
@@ -47,33 +50,39 @@ type Msg
     = WindowResized WindowSize
 
 
-init : Request -> Json.Value -> ( Model, Cmd Msg )
-init _ flags =
+init : Json.Value -> Nav.Key -> ( Model, Cmd Msg )
+init flags key =
     let
         model =
             case Json.decodeValue flagsDecoder flags of
-                Ok m ->
-                    m
+                Ok f ->
+                    { key = key
+                    , identity = Nothing
+                    , formula = f.formula
+                    , initialPoint = f.initialPoint
+                    , coefs = f.coefs
+                    , windowSize = f.windowSize
+                    }
 
                 Err _ ->
-                    { formula = ""
+                    { key = key
+                    , identity = Nothing
+                    , formula = ""
                     , initialPoint = []
                     , coefs = []
                     , windowSize = WindowSize 1024 768
                     }
     in
-    ( model
-    , Cmd.none
-    )
+    ( model, Cmd.none )
 
 
-update : Request -> Msg -> Model -> ( Model, Cmd Msg )
-update _ msg model =
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
     case msg of
         WindowResized size ->
             ( { model | windowSize = size }, Cmd.none )
 
 
-subscriptions : Request -> Model -> Sub Msg
-subscriptions _ _ =
+subscriptions : Model -> Sub Msg
+subscriptions _ =
     Events.onResize (\width height -> WindowResized (WindowSize width height))

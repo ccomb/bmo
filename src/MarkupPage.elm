@@ -1,5 +1,6 @@
-module MarkupPage exposing (Model, Msg, init, subscriptions, update, view)
+module MarkupPage exposing (Flags, Model, Msg, init, subscriptions, update, view)
 
+import Effect exposing (Effect)
 import Element as E exposing (Element)
 import Element.Background as Background
 import Element.Border as Border
@@ -12,7 +13,6 @@ import Http
 import Mark
 import Mark.Error
 import Maybe
-import Request exposing (Request)
 import Result exposing (Result)
 import Set exposing (Set)
 import Shared exposing (WindowSize)
@@ -37,28 +37,33 @@ type Msg
     | ClosedIFrame String
 
 
-init : Request -> ( Model, Cmd Msg )
-init req =
+type alias Flags =
+    String
+
+
+init : Flags -> ( Model, Effect Shared.Msg Msg )
+init flags =
     ( { markup = Loading
       , openIFrames = Set.empty
       }
-    , Http.get
-        { url =
-            let
-                path =
-                    if req.url.path == "/" then
-                        "home_"
+    , Effect.fromCmd <|
+        Http.get
+            { url =
+                let
+                    path =
+                        if flags == "" then
+                            "home_"
 
-                    else
-                        req.url.path
-            in
-            "/content/" ++ path
-        , expect = Http.expectString GotMarkup
-        }
+                        else
+                            flags
+                in
+                "/content/" ++ path
+            , expect = Http.expectString GotMarkup
+            }
     )
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
+update : Msg -> Model -> ( Model, Effect Shared.Msg Msg )
 update msg model =
     case msg of
         GotMarkup result ->
@@ -67,7 +72,7 @@ update msg model =
                     ( { model
                         | markup = Loaded markup
                       }
-                    , Cmd.none
+                    , Effect.none
                     )
 
                 Err error ->
@@ -75,18 +80,18 @@ update msg model =
                     ( { model
                         | markup = Failed "Could not load the content"
                       }
-                    , Cmd.none
+                    , Effect.none
                     )
 
         OpenedIFrame name ->
-            ( { model | openIFrames = Set.insert name model.openIFrames }, Cmd.none )
+            ( { model | openIFrames = Set.insert name model.openIFrames }, Effect.none )
 
         ClosedIFrame name ->
-            ( { model | openIFrames = Set.remove name model.openIFrames }, Cmd.none )
+            ( { model | openIFrames = Set.remove name model.openIFrames }, Effect.none )
 
 
-view : Shared.Model -> Request -> Model -> View Msg
-view shared _ model =
+view : Shared.Model -> Model -> View Msg
+view shared model =
     case model.markup of
         Loading ->
             loadingPage
@@ -357,6 +362,7 @@ iframeBlock model size =
         |> Mark.toBlock
 
 
+link : Mark.Record (E.Element msg)
 link =
     Mark.annotation "link"
         (\styles url ->
@@ -372,6 +378,7 @@ link =
         |> Mark.field "url" Mark.string
 
 
+cta : Mark.Record (E.Element msg)
 cta =
     Mark.annotation "cta"
         (\styles url color background ->
@@ -399,6 +406,7 @@ cta =
         |> Mark.field "background" Mark.string
 
 
+image : Mark.Record (E.Element msg)
 image =
     Mark.annotation "img"
         (\_ src width desc -> E.image [ E.width (E.px width) ] { src = src, description = desc })

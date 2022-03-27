@@ -3,18 +3,19 @@ version: '3'
 services:
   ms:
     build: .
-    ports:
-      - "8000:8000"
+    environment:
+      HOST: "https://app.business-model-optimizer.com"
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+    networks:
+      - caddy_default
     volumes:
       - tmp:/tmp/
       - mongodata:/data
-      - .:/srv
-
   mongo:
     image: mongo:5
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
-      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     volumes:
       - mongodata:/data/
       - tmp:/tmp/
@@ -22,3 +23,7 @@ services:
 volumes:
   mongodata:
   tmp:
+
+networks:
+  caddy_default:
+    external: true

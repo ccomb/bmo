@@ -17,7 +17,7 @@ import os
 import sympy
 
 api = FastAPI()
-api.mount("/public", StaticFiles(directory="../public"), name="public")
+api.mount("/public", StaticFiles(directory="../build"), name="public")
 templates = Jinja2Templates(directory="../public")
 
 MONGOPASSWORD = os.environ.get("MONGO_INITDB_ROOT_PASSWORD", "root")

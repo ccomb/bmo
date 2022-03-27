@@ -1,0 +1,24 @@
+version: '3'
+
+services:
+  ms:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - tmp:/tmp/
+      - mongodata:/data
+      - .:/srv
+
+  mongo:
+    image: mongo:5
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    volumes:
+      - mongodata:/data/
+      - tmp:/tmp/
+
+volumes:
+  mongodata:
+  tmp:

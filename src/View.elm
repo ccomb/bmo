@@ -1,9 +1,7 @@
-module View exposing (View, map, none, placeholder, toBrowserDocument)
+module View exposing (View, defaultView, map, none, placeholder, toBrowserDocument)
 
 import Browser
 import Element as E exposing (Element)
-import Element.Background as Background
-import Element.Font as Font
 
 
 type alias View msg =
@@ -32,6 +30,11 @@ map fn view =
     , attributes = List.map (E.mapAttribute fn) view.attributes
     , element = E.map fn view.element
     }
+
+
+defaultView : View msg
+defaultView =
+    placeholder "404"
 
 
 toBrowserDocument : View msg -> Browser.Document msg

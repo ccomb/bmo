@@ -1,35 +1,36 @@
 module Pages.App exposing (Model, Msg, page)
 
+--import Dropdown
+
 import Browser.Navigation as Nav
-import Debouncer.Messages as Debouncer exposing (Debouncer)
+import Debouncer.Basic as Debouncer exposing (Debouncer)
 import Dict
-import Dropdown
+import Effect exposing (Effect)
 import Element as E
 import Element.Background as Background
 import Element.Border as Border
 import Element.Font as Font
 import Element.Input as Input
-import Gen.Params.App exposing (Params)
-import Gen.Route exposing (Route(..))
 import Http
-import Optim exposing (Coef(..), Coefs, Formula, OptimizationResult, Point, Variable(..), resultDecoder)
-import Page
-import Request
+import Optim exposing (Coef(..), Coefs, Formula, OptimizationResult, Point, Variable(..), isFilled, resultDecoder)
 import Round
+import Route exposing (OptimFlags(..), formulaUrl, idUrl)
 import Shared
+import Spa.Page
 import Task
 import Url.Builder as UrlBuilder
 import View exposing (View)
 
 
-page : Shared.Model -> Request.With Params -> Page.With Model Msg
-page shared req =
-    Page.element
-        { init = init shared req
-        , update = update req
+page : Shared.Model -> Spa.Page.Page OptimFlags Shared.Msg (View Msg) Model Msg
+page shared =
+    Spa.Page.element
+        { init = init shared
+        , update = update shared
         , view = view
         , subscriptions = subscriptions
         }
+        |> Spa.Page.onNewFlags (\_ -> Void)
 
 
 
@@ -47,7 +48,7 @@ type alias Model =
     , initialPoint : Point
     , coefs : Coefs
     , nearestPoint : Point
-    , debouncer : Debouncer Msg
+    , debouncer : Debouncer Msg Msg
     , spinnerV : Bool
     , spinnerR : Bool
     , error : Maybe String
@@ -58,14 +59,15 @@ type alias Model =
 
 
 type Msg
-    = FormulaChanged String
+    = Void
+    | FormulaChanged String
     | GetVariables
     | GotVariables (Result Http.Error OptimizationResult)
     | InitialValueChanged String String
       --    | CoefChanged String Float
     | GetResult
     | GotResult (Result Http.Error OptimizationResult)
-    | Delay (Debouncer.Msg Msg)
+    | Debounce (Debouncer.Msg Msg)
 
 
 
@@ -81,43 +83,41 @@ defaultPlaceholder =
     ""
 
 
-init : Shared.Model -> Request.With Params -> ( Model, Cmd Msg )
-init shared req =
+init : Shared.Model -> OptimFlags -> ( Model, Effect Shared.Msg Msg )
+init shared flags =
     let
         formula =
-            Dict.get "formula" req.query |> Maybe.withDefault ""
+            case flags of
+                OQFormula f ->
+                    f
+
+                _ ->
+                    shared.formula
 
         model =
-            { formula =
-                if formula /= "" then
-                    formula
-
-                else
-                    shared.formula
+            { formula = formula
             , initialPoint = shared.initialPoint
             , coefs = shared.coefs
             , nearestPoint = []
             , debouncer = Debouncer.manual |> Debouncer.settleWhenQuietFor (Just <| Debouncer.fromSeconds 1.5) |> Debouncer.toDebouncer
             , spinnerV = formula /= ""
-            , spinnerR = isFilled shared.initialPoint
+            , spinnerR = False
             , error = Nothing
 
             --, dropdownState = Dropdown.init "Select your objective"
             , selectedObjective = Nothing
             }
     in
-    ( model
-    , Task.perform ((\_ -> GetVariables) >> Debouncer.provideInput >> Delay)
-        (Task.succeed "")
-    )
-
-
-pointToNames : Point -> List String
-pointToNames point =
-    List.map (\(Variable n _) -> n) point
+    ( model, Effect.fromCmd <| getVariables model )
 
 
 
+--pointToNames : Point -> List String
+--pointToNames point =
+--    List.map (\(Variable n _) -> n) point
+--
+--
+--
 --dropdownConfig : Model -> Dropdown.Config Objective Msg Model
 --dropdownConfig model =
 --    let
@@ -183,17 +183,12 @@ pointToNames point =
 ------------
 
 
-updateDebouncer : Debouncer.UpdateConfig Msg Model
-updateDebouncer =
-    { mapMsg = Delay
-    , getDebouncer = .debouncer
-    , setDebouncer = \d model -> { model | debouncer = d }
-    }
-
-
-update : Request.With Params -> Msg -> Model -> ( Model, Cmd Msg )
-update req msg model =
+update : Shared.Model -> Msg -> Model -> ( Model, Effect Shared.Msg Msg )
+update shared msg model =
     case msg of
+        Void ->
+            ( model, Effect.none )
+
         FormulaChanged inputstring ->
             ( { model
                 | formula = inputstring
@@ -211,16 +206,18 @@ update req msg model =
                     else
                         model.nearestPoint
               }
-            , Task.perform ((\_ -> GetVariables) >> Debouncer.provideInput >> Delay)
+            , Effect.perform
+                (Debounce << Debouncer.provideInput << (\_ -> GetVariables))
                 (Task.succeed "")
             )
 
         GetVariables ->
             ( { model | spinnerV = True }
-            , Cmd.batch
-                [ getVariables model
-                , Nav.replaceUrl req.key <| buildFormulaUrl model
-                ]
+            , Effect.fromCmd <|
+                Cmd.batch
+                    [ getVariables model
+                    , Nav.replaceUrl shared.key <| formulaUrl model.formula
+                    ]
             )
 
         InitialValueChanged name value ->
@@ -256,12 +253,12 @@ update req msg model =
             in
             if isFilled newpoint then
                 ( { model | initialPoint = newpoint, coefs = newcoefs, spinnerR = True }
-                , Task.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Delay) (Task.succeed "")
+                , Effect.perform ((\_ -> GetResult) >> Debouncer.provideInput >> Debounce) (Task.succeed "")
                 )
 
             else
                 ( { model | initialPoint = newpoint, coefs = newcoefs, nearestPoint = [] }
-                , Cmd.none
+                , Effect.none
                 )
 
         GotVariables result ->
@@ -273,10 +270,10 @@ update req msg model =
                     in
                     ( { model | initialPoint = newpoint, nearestPoint = [], spinnerV = False }
                     , if isFilled newpoint then
-                        getResult model
+                        Effect.fromCmd <| getResult model
 
                       else
-                        Cmd.none
+                        Effect.none
                     )
 
                 Err error ->
@@ -291,17 +288,17 @@ update req msg model =
                         , nearestPoint = []
                         , spinnerV = False
                       }
-                    , Cmd.none
+                    , Effect.none
                     )
 
         GetResult ->
-            ( { model | spinnerR = True }, getResult model )
+            ( { model | spinnerR = True }, Effect.fromCmd <| getResult model )
 
         GotResult optresult ->
             case optresult of
                 Ok result ->
                     ( { model | nearestPoint = result.point, spinnerR = False }
-                    , Nav.replaceUrl req.key <| buildIdUrl model result
+                    , Effect.fromCmd <| Nav.pushUrl shared.key <| idUrl (Maybe.withDefault "" result.id)
                     )
 
                 Err error ->
@@ -315,11 +312,27 @@ update req msg model =
                             else
                                 Nothing
                       }
-                    , Cmd.none
+                    , Effect.none
                     )
 
-        Delay subMsg ->
-            Debouncer.update (update req) updateDebouncer subMsg model
+        Debounce debMsg ->
+            let
+                ( debouncer, subCmd, emittedMsg ) =
+                    Debouncer.update debMsg model.debouncer
+
+                mappedCmd =
+                    Effect.map Debounce (Effect.fromCmd subCmd)
+
+                updatedModel =
+                    { model | debouncer = debouncer }
+            in
+            case emittedMsg of
+                Just emitted ->
+                    update shared emitted updatedModel
+                        |> Tuple.mapSecond (\cmd -> Effect.batch [ cmd, mappedCmd ])
+
+                Nothing ->
+                    ( updatedModel, mappedCmd )
 
 
 
@@ -367,19 +380,6 @@ httpErrorToString error =
             Just "Other error"
 
 
-isFilled : Point -> Bool
-isFilled point =
-    if List.length point == 0 then
-        False
-
-    else
-        List.all
-            (\(Variable _ v) ->
-                String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
-            )
-            point
-
-
 updatePoint :
     Point
     -> Point
@@ -402,49 +402,39 @@ updatePoint newpoint point =
             )
 
 
-buildFormulaUrl : Model -> String
-buildFormulaUrl model =
-    UrlBuilder.absolute [ "app" ] [ UrlBuilder.string "formula" model.formula ]
-
-
-buildIdUrl : Model -> OptimizationResult -> String
-buildIdUrl model result =
-    result.id |> Maybe.map (\i -> UrlBuilder.absolute [ "app" ] [ UrlBuilder.string "id" i ]) |> Maybe.withDefault (buildFormulaUrl model)
-
-
 
 ---------------------
 -- TALK TO BACKEND --
 ---------------------
 
 
-queryFormula : String -> String
-queryFormula inputstring =
+qsFormula : String -> String
+qsFormula inputstring =
     UrlBuilder.absolute [ "optimize" ] [ UrlBuilder.string "formula" inputstring ]
 
 
-queryResult : Formula -> Point -> Coefs -> Maybe Objective -> String
-queryResult inputstring point coefs objective =
+qsResult : Formula -> Point -> Coefs -> Maybe Objective -> String
+qsResult inputstring point coefs objective =
     UrlBuilder.absolute [ "optimize" ]
         (UrlBuilder.string "formula" inputstring
-            :: List.map queryPoint point
-            ++ List.map queryCoef coefs
-            ++ queryObjective objective
+            :: List.map qsPoint point
+            ++ List.map qsCoef coefs
+            ++ qsObjective objective
         )
 
 
-queryPoint : Variable -> UrlBuilder.QueryParameter
-queryPoint (Variable name value) =
+qsPoint : Variable -> UrlBuilder.QueryParameter
+qsPoint (Variable name value) =
     UrlBuilder.string name (value |> String.toFloat |> Maybe.map String.fromFloat |> Maybe.withDefault "")
 
 
-queryCoef : Coef -> UrlBuilder.QueryParameter
-queryCoef (Coef name value) =
+qsCoef : Coef -> UrlBuilder.QueryParameter
+qsCoef (Coef name value) =
     UrlBuilder.string ("coef_" ++ name) (value |> String.fromFloat)
 
 
-queryObjective : Maybe Objective -> List UrlBuilder.QueryParameter
-queryObjective objective =
+qsObjective : Maybe Objective -> List UrlBuilder.QueryParameter
+qsObjective objective =
     case objective of
         Nothing ->
             []
@@ -456,7 +446,7 @@ queryObjective objective =
 getVariables : Model -> Cmd Msg
 getVariables model =
     Http.get
-        { url = queryFormula model.formula
+        { url = qsFormula model.formula
         , expect = Http.expectJson GotVariables resultDecoder
         }
 
@@ -464,7 +454,7 @@ getVariables model =
 getResult : Model -> Cmd Msg
 getResult model =
     Http.get
-        { url = queryResult model.formula model.initialPoint model.coefs model.selectedObjective
+        { url = qsResult model.formula model.initialPoint model.coefs model.selectedObjective
         , expect = Http.expectJson GotResult resultDecoder
         }
 

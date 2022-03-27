@@ -6,6 +6,7 @@ module Optim exposing
     , Point
     , Variable(..)
     , coefsDecoder
+    , isFilled
     , pointDecoder
     , resultDecoder
     )
@@ -38,6 +39,19 @@ type alias OptimizationResult =
     { point : Point
     , id : Maybe String
     }
+
+
+isFilled : Point -> Bool
+isFilled point =
+    if List.length point == 0 then
+        False
+
+    else
+        List.all
+            (\(Variable _ v) ->
+                String.toFloat v |> Maybe.map (always True) |> Maybe.withDefault False
+            )
+            point
 
 
 pointDecoder : Json.Decoder Point
