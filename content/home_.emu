@@ -1,9 +1,9 @@
-|> hero
+|> HERO
     backgroundColor = 80 80 70
     image= /public/hero.jpg
     textColor = 100 100 100 90
     titleBackground = 0 0 0 60
-    title = Découvrez le chemin le plus court vers votre objectif de rentabilité.
+    tagline = Découvrez le chemin le plus court vers votre objectif de rentabilité.
     url = /app
     text = Utilisez le Business Model Optimizer
     background = 20 50 20
@@ -25,7 +25,7 @@ Le problème est que vous ne savez pas exactement quoi faire. Quel paramètre de
 
 Quelques exemples possibles :
 
-|> Tree
+|> TREE
     - Réduire les charges fixes. Mais lesquelles ?
     - Augmenter les tarifs ? Mais de quel produit ? Et de combien de pourcents ?
     - Changer de fournisseur et réduire les coûts des matières premières ?
@@ -40,6 +40,15 @@ Mais si vous avez plusieurs types et catalogues de produits, une structure de co
 
 Lisez la suite pour comprendre comment l'utiliser.
 
+ [Nb simulations]{nb}
+
+
+|> SECTION
+    height = 200
+    backgroundColor = 20 50 20
+    content = plop test []{nb}
+    color = 100 100 100 90
+
 
 |> H2
     Comment utiliser cet outil ?
@@ -52,12 +61,12 @@ Résultat annuel = produits - charges
 
 C'est une formule simplissime avec trois variables :
 
-|> Tree
+|> TREE
     - le résultat annuel
     - les produits
     - les charges
 
-Vous pouvez entrer cette formule dans l'outil, chacun des noms de variables ne doit contenir aucune espace. On va donc l'écrire : `resultat = produits - charges`. [→ Essayez]{ cta | background=95 95 95, color=10 10 10, url=/app?formula=resultat%20%3D%20produits%20-%20charges}.
+Vous pouvez entrer cette formule dans l'outil, chacun des noms de variables ne doit contenir aucune espace. On va donc l'écrire : `resultat = produits - charges`. [→ Essayez]{ cta | background=20 50 20, color=90 90 90, url=/app?formula=resultat%20%3D%20produits%20-%20charges}.
 
 Imaginons que vous ayez actuellement 500k€ de produits et 500k€ de charge. Et vous voudriez obtenir 100k€ de résultat. Vous rentrez ces trois valeurs dans l'outil, et le résultat tombe :
 
@@ -72,15 +81,15 @@ Et cette fois vous décidez que l'objectif de résultat est 100k€ non négocia
 
 La formule peut maintenant ressembler à :
 
-`prix1 * NbVentes1 + prix2 * NbVentes2 - charges = 100000` [→ Essayez]{ cta | background=95 95 95, color=10 10 10, url=/app?formula=prix1%20*%20NbVentes1%20%2B%20prix2%20*%20NbVentes2%20-%20charges%20%3D%20100000 } 
+`prix1 * NbVentes1 + prix2 * NbVentes2 - charges = 100000` [→ Essayez]{ cta | background=20 50 20, color=90 90 90, url=/app?formula=prix1%20*%20NbVentes1%20%2B%20prix2%20*%20NbVentes2%20-%20charges%20%3D%20100000 } 
 
-|> Tree
+|> TREE
     - Votre Article 1 vaut 100€, vous en vendez 3000 par an ;
     - Votre Article 2 vaut 2000€, vous en vendez 100 par an.
 
 Vous saisissez ces valeurs dans l'outil, elles correspondant à votre situation actuelle. En quelques secondes vous obtenez les valeurs cibles suivantes :
 
-|> Tree
+|> TREE
     - Augmenter les ventes de l'article 1 de 6%, augmentez son prix également de 6%
     - Augmentez les ventes de l'article 2 de 4%, augmentez son prix également de 4%
     - Baissez vos charges de 9%
@@ -163,7 +172,7 @@ Nous aidons déjà des startups et des organisations internationales de toutes t
     background = 20 50 20
     color = 90 90 90
     links =
-        |> Tree
+        |> TREE
             - [Anybox]{img|src=/public/anybox.png, width=200 , desc=Anybox }
             - [Innovation web]{ link | url=https://www.anybox.fr/comment-developper-un-produit-numerique}
             - [IA, Machine Learning]{ link | url=https://www.anybox.fr/contactus?name=Machine%20Learning}

@@ -197,13 +197,9 @@ decodeColor colorstring =
 
 document : Shared.Model -> Model -> Mark.Document (E.Element Msg)
 document shared model =
-    let
-        size =
-            shared.windowSize
-    in
     Mark.document
         (E.column
-            [ E.width (E.px size.w)
+            [ E.width (E.px shared.windowSize.w)
             , Font.family
                 [ Font.typeface "Gotu"
                 ]
@@ -211,36 +207,37 @@ document shared model =
             ]
         )
         (Mark.manyOf
-            [ hero size
-            , title size 1
-            , title size 2
-            , title size 3
-            , Mark.map (E.paragraph [ E.spacing 10, paddingAuto size 0 ]) textBlock
-            , ctaBlock size
-            , imageBlock size
-            , iframeBlock model size
-            , treeBlock size
-            , footerBlock size
+            [ hero shared
+            , title shared 1
+            , title shared 2
+            , title shared 3
+            , Mark.map (E.paragraph [ E.spacing 10, paddingAuto shared.windowSize 0 ]) (textBlock shared)
+            , ctaBlock shared
+            , imageBlock shared
+            , iframeBlock model shared
+            , treeBlock shared
+            , footerBlock shared
+            , sectionBlock shared
             ]
         )
 
 
-hero : WindowSize -> Mark.Block (E.Element msg)
-hero size =
-    Mark.record "hero"
+hero : Shared.Model -> Mark.Block (E.Element msg)
+hero shared =
+    Mark.record "HERO"
         (\backgroundColor textColor img tagline titleBackground url text background color heightRatio ->
             E.row
-                [ E.height <| E.px <| floor <| toFloat size.h * heightRatio
+                [ E.height <| E.px <| floor <| toFloat shared.windowSize.h * heightRatio
                 , Background.color (decodeColor backgroundColor)
                 , Background.image img
                 , Region.heading 1
-                , Font.size (size.h // 30 |> min 40 |> max 25)
+                , Font.size (shared.windowSize.h // 30 |> min 40 |> max 25)
                 , Font.extraBold
                 , E.width E.fill
                 ]
                 [ E.column
                     [ E.centerX
-                    , E.width (E.px (max 375 (size.w // 2)))
+                    , E.width (E.px (max 375 (shared.windowSize.w // 2)))
                     , Background.color <| decodeColor titleBackground
                     , Font.color (decodeColor textColor)
                     , Border.rounded 15
@@ -273,7 +270,7 @@ hero size =
         |> Mark.field "backgroundColor" Mark.string
         |> Mark.field "textColor" Mark.string
         |> Mark.field "image" Mark.string
-        |> Mark.field "title" Mark.string
+        |> Mark.field "tagline" Mark.string
         |> Mark.field "titleBackground" Mark.string
         |> Mark.field "url" Mark.string
         |> Mark.field "text" Mark.string
@@ -283,11 +280,11 @@ hero size =
         |> Mark.toBlock
 
 
-imageBlock : WindowSize -> Mark.Block (E.Element msg)
-imageBlock size =
+imageBlock : Shared.Model -> Mark.Block (E.Element msg)
+imageBlock shared =
     Mark.record "Image"
         (\src desc ->
-            E.column [ E.centerX, paddingAuto size 0 ]
+            E.column [ E.centerX, paddingAuto shared.windowSize 0 ]
                 [ E.image [] { src = src, description = desc }
                 ]
         )
@@ -296,13 +293,13 @@ imageBlock size =
         |> Mark.toBlock
 
 
-iframeBlock : Model -> WindowSize -> Mark.Block (E.Element Msg)
-iframeBlock model size =
+iframeBlock : Model -> Shared.Model -> Mark.Block (E.Element Msg)
+iframeBlock model shared =
     Mark.record "iframe"
         (\name button color bcolor src width height background ->
             E.el
                 [ E.width E.fill
-                , paddingAuto size 0
+                , paddingAuto shared.windowSize 0
                 , Background.color (decodeColor background)
                 ]
             <|
@@ -436,17 +433,17 @@ fromMark styles =
         ]
 
 
-textBlock : Mark.Block (List (E.Element msg))
-textBlock =
+textBlock : Shared.Model -> Mark.Block (List (E.Element msg))
+textBlock shared =
     Mark.textWith
         { view = \styles str -> E.el (fromMark styles) (E.text str)
         , replacements = []
-        , inlines = [ link, cta, image ]
+        , inlines = [ link, cta, image, nb shared ]
         }
 
 
-title : WindowSize -> Int -> Mark.Block (E.Element msg)
-title size level =
+title : Shared.Model -> Int -> Mark.Block (E.Element msg)
+title shared level =
     -- H1, H2, H3 title
     Mark.block ("H" ++ String.fromInt level)
         (\children ->
@@ -454,18 +451,18 @@ title size level =
                 [ Region.heading level
                 , Font.size (45 - 6 * level)
                 , Font.heavy
-                , paddingAuto size 20
+                , paddingAuto shared.windowSize 20
                 ]
                 children
         )
-        textBlock
+        (textBlock shared)
 
 
-ctaBlock : WindowSize -> Mark.Block (E.Element msg)
-ctaBlock size =
+ctaBlock : Shared.Model -> Mark.Block (E.Element msg)
+ctaBlock shared =
     Mark.record "ctaBlock"
         (\text url color background ->
-            E.row [ paddingAuto size 0 ]
+            E.row [ paddingAuto shared.windowSize 0 ]
                 [ E.link
                     [ Background.color <| decodeColor background
                     , E.spacing 30
@@ -491,9 +488,9 @@ ctaBlock size =
         |> Mark.toBlock
 
 
-treeBlock : WindowSize -> Mark.Block (E.Element msg)
-treeBlock size =
-    Mark.tree "Tree" (renderTree size) textBlock
+treeBlock : Shared.Model -> Mark.Block (E.Element msg)
+treeBlock shared =
+    Mark.tree "TREE" (renderTree shared.windowSize) (textBlock shared)
 
 
 renderTree : WindowSize -> Mark.Enumerated (List (E.Element msg)) -> E.Element msg
@@ -516,8 +513,8 @@ renderItem size (Mark.Item item) =
         ]
 
 
-footerBlock : WindowSize -> Mark.Block (E.Element msg)
-footerBlock size =
+footerBlock : Shared.Model -> Mark.Block (E.Element msg)
+footerBlock shared =
     Mark.record "Footer"
         (\background color links ->
             E.el
@@ -534,19 +531,19 @@ footerBlock size =
                     , E.centerY
                     , E.spacing 20
                     , E.width E.fill
-                    , E.paddingXY (size.w // 5) 0
+                    , E.paddingXY (shared.windowSize.w // 5) 0
                     , Font.color (decodeColor color)
                     ]
                     links
         )
         |> Mark.field "background" Mark.string
         |> Mark.field "color" Mark.string
-        |> Mark.field "links" (Mark.tree "Tree" renderInlineTree textBlock)
+        |> Mark.field "links" (Mark.tree "TREE" renderTreeInline (textBlock shared))
         |> Mark.toBlock
 
 
-renderInlineTree : Mark.Enumerated (List (E.Element msg)) -> List (E.Element msg)
-renderInlineTree (Mark.Enumerated list) =
+renderTreeInline : Mark.Enumerated (List (E.Element msg)) -> List (E.Element msg)
+renderTreeInline (Mark.Enumerated list) =
     List.map renderInlineItem list.items
 
 
@@ -554,6 +551,33 @@ renderInlineItem : Mark.Item (List (E.Element msg)) -> E.Element msg
 renderInlineItem (Mark.Item item) =
     E.row [ E.width E.fill ] <|
         List.map (\i -> E.paragraph [ Font.center ] i) item.content
+
+
+sectionBlock : Shared.Model -> Mark.Block (E.Element msg)
+sectionBlock shared =
+    Mark.record "SECTION"
+        (\height backgroundColor content color ->
+            E.wrappedRow
+                [ Background.color (decodeColor backgroundColor)
+                , paddingAuto shared.windowSize 20
+                , Font.size 20
+                , E.width E.fill
+                , E.height <| E.px height
+                , Font.color (decodeColor color)
+                ]
+                [ E.paragraph [] [ E.text content ] ]
+        )
+        |> Mark.field "height" Mark.int
+        |> Mark.field "backgroundColor" Mark.string
+        |> Mark.field "content" Mark.string
+        |> Mark.field "color" Mark.string
+        |> Mark.toBlock
+
+
+nb : Shared.Model -> Mark.Record (E.Element msg)
+nb shared =
+    Mark.annotation "nb"
+        (\_ -> E.text <| String.fromInt shared.nbsimu)
 
 
 subscriptions : Model -> Sub Msg

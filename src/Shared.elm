@@ -16,6 +16,7 @@ type alias Flags =
     { formula : Formula
     , initialPoint : Point
     , coefs : Coefs
+    , nbsimu : Int
     , windowSize : WindowSize
     }
 
@@ -26,6 +27,7 @@ type alias Model =
     , formula : Formula
     , initialPoint : Point
     , coefs : Coefs
+    , nbsimu : Int
     , windowSize : WindowSize
     }
 
@@ -37,10 +39,11 @@ identity =
 
 flagsDecoder : Json.Decoder Flags
 flagsDecoder =
-    Json.map4 Flags
+    Json.map5 Flags
         (Json.field "formula" Json.string)
         (Json.field "initial_point" pointDecoder)
         (Json.field "coefs" coefsDecoder)
+        (Json.field "nbsimu" Json.int)
         (Json.field "window_size"
             (Json.map2 WindowSize (Json.field "w" Json.int) (Json.field "h" Json.int))
         )
@@ -61,6 +64,7 @@ init flags key =
                     , formula = f.formula
                     , initialPoint = f.initialPoint
                     , coefs = f.coefs
+                    , nbsimu = f.nbsimu
                     , windowSize = f.windowSize
                     }
 
@@ -70,6 +74,7 @@ init flags key =
                     , formula = ""
                     , initialPoint = []
                     , coefs = []
+                    , nbsimu = 0
                     , windowSize = WindowSize 1024 768
                     }
     in

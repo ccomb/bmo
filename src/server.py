@@ -132,6 +132,7 @@ async def home(request: Request):
         "coefs": {},
         "closest_solution": {},
         "objective": "",
+        "nbsimu": 0,
     }
     try:
         _id = request.query_params.get("id", "")
@@ -141,6 +142,7 @@ async def home(request: Request):
         flags["initial_point"] = doc.get("initial_point", {})
         flags["coefs"] = doc.get("coefs", {})
         flags["closest_solution"] = doc.get("closest_solution", {})
+        flags["nbsimu"] = int(CLIENT.bmo.optim.estimated_document_count())
     except pymongo.errors.ServerSelectionTimeoutError as error:
         return templates.TemplateResponse(
             "500.html",
