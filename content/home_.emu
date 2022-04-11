@@ -38,7 +38,7 @@ Mais si vous avez plusieurs types et catalogues de produits, une structure de co
 
 
 |> SECTION
-    height = 200
+    padding = 50
     backgroundColor = 20 50 20
     color = 100 100 100 90
     fontsize = 40

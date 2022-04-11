@@ -562,18 +562,17 @@ textSection shared =
 sectionBlock : Shared.Model -> Mark.Block (E.Element msg)
 sectionBlock shared =
     Mark.record "SECTION"
-        (\height backgroundColor content color fontsize ->
+        (\padding backgroundColor content color fontsize ->
             E.wrappedRow
                 [ Background.color (decodeColor backgroundColor)
-                , paddingAuto shared.windowSize 20
+                , paddingAuto shared.windowSize padding
                 , Font.size fontsize
                 , E.width E.fill
-                , E.height <| E.px height
                 , Font.color (decodeColor color)
                 ]
                 [ E.paragraph [] [ content ] ]
         )
-        |> Mark.field "height" Mark.int
+        |> Mark.field "padding" Mark.int
         |> Mark.field "backgroundColor" Mark.string
         |> Mark.field "content" (textBlock shared)
         |> Mark.field "color" Mark.string
