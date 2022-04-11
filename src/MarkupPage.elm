@@ -211,7 +211,7 @@ document shared model =
             , title shared 1
             , title shared 2
             , title shared 3
-            , Mark.map (E.paragraph [ E.spacing 10, paddingAuto shared.windowSize 0 ]) (textBlock shared)
+            , textSection shared
             , ctaBlock shared
             , imageBlock shared
             , iframeBlock model shared
@@ -433,27 +433,28 @@ fromMark styles =
         ]
 
 
-textBlock : Shared.Model -> Mark.Block (List (E.Element msg))
+textBlock : Shared.Model -> Mark.Block (E.Element msg)
 textBlock shared =
-    Mark.textWith
-        { view = \styles str -> E.el (fromMark styles) (E.text str)
-        , replacements = []
-        , inlines = [ link, cta, image, nb shared ]
-        }
+    Mark.map (E.paragraph [ E.spacing 10 ]) <|
+        Mark.textWith
+            { view = \styles str -> E.el (fromMark styles) (E.text str)
+            , replacements = []
+            , inlines = [ link, cta, image, nb shared ]
+            }
 
 
 title : Shared.Model -> Int -> Mark.Block (E.Element msg)
 title shared level =
     -- H1, H2, H3 title
     Mark.block ("H" ++ String.fromInt level)
-        (\children ->
-            E.paragraph
+        (\child ->
+            E.el
                 [ Region.heading level
                 , Font.size (45 - 6 * level)
                 , Font.heavy
                 , paddingAuto shared.windowSize 20
                 ]
-                children
+                child
         )
         (textBlock shared)
 
@@ -490,7 +491,7 @@ ctaBlock shared =
 
 treeBlock : Shared.Model -> Mark.Block (E.Element msg)
 treeBlock shared =
-    Mark.tree "TREE" (renderTree shared.windowSize) (textBlock shared)
+    Mark.tree "TREE" (renderTree shared.windowSize) (Mark.map (\b -> [ b ]) (textBlock shared))
 
 
 renderTree : WindowSize -> Mark.Enumerated (List (E.Element msg)) -> E.Element msg
@@ -538,7 +539,7 @@ footerBlock shared =
         )
         |> Mark.field "background" Mark.string
         |> Mark.field "color" Mark.string
-        |> Mark.field "links" (Mark.tree "TREE" renderTreeInline (textBlock shared))
+        |> Mark.field "links" (Mark.tree "TREE" renderTreeInline (Mark.map (\b -> [ b ]) (textBlock shared)))
         |> Mark.toBlock
 
 
@@ -553,30 +554,37 @@ renderInlineItem (Mark.Item item) =
         List.map (\i -> E.paragraph [ Font.center ] i) item.content
 
 
+textSection : Shared.Model -> Mark.Block (E.Element msg)
+textSection shared =
+    Mark.map (E.el [ paddingAuto shared.windowSize 0 ]) (textBlock shared)
+
+
 sectionBlock : Shared.Model -> Mark.Block (E.Element msg)
 sectionBlock shared =
     Mark.record "SECTION"
-        (\height backgroundColor content color ->
+        (\height backgroundColor content color fontsize ->
             E.wrappedRow
                 [ Background.color (decodeColor backgroundColor)
                 , paddingAuto shared.windowSize 20
-                , Font.size 20
+                , Font.size fontsize
                 , E.width E.fill
                 , E.height <| E.px height
                 , Font.color (decodeColor color)
                 ]
-                [ E.paragraph [] [ E.text content ] ]
+                [ E.paragraph [] [ content ] ]
         )
         |> Mark.field "height" Mark.int
         |> Mark.field "backgroundColor" Mark.string
-        |> Mark.field "content" Mark.string
+        |> Mark.field "content" (textBlock shared)
         |> Mark.field "color" Mark.string
+        |> Mark.field "fontsize" Mark.int
         |> Mark.toBlock
 
 
 nb : Shared.Model -> Mark.Record (E.Element msg)
 nb shared =
     Mark.annotation "nb"
+        -- TODO how to specify nbsimu from the markup?
         (\_ -> E.text <| String.fromInt shared.nbsimu)
 
 
