@@ -91,5 +91,5 @@ resultDecoder =
                         (Json.field "id" (Json.maybe Json.string))
 
                 else
-                    Json.fail s
+                    Json.fail <| "Status \"" ++ s ++ "\" is not supported"
             )
