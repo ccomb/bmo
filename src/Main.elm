@@ -31,7 +31,7 @@ toDocument shared view =
 main =
     Spa.init
         { defaultView = View.defaultView
-        , extractIdentity = Shared.identity
+        , extractIdentity = .identity
         }
         |> Spa.addPublicPage mappers Route.matchContent Home.page
         |> Spa.addPublicPage mappers Route.matchOptimizer App.page
