@@ -4,7 +4,6 @@ services:
   ms:
     build: .
     environment:
-      HOST: "https://app.business-model-optimizer.com"
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     networks:
       - caddy_default

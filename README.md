@@ -18,7 +18,7 @@ or locally:
 
 on a server:
 
-`docker run -e HOST=<hostname>`
+`docker run
 
 ## visit
 

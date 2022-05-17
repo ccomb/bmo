@@ -1,4 +1,4 @@
-module Shared exposing (Flags, Model, Msg, WindowSize, identity, init, subscriptions, update)
+module Shared exposing (Flags, Model, Msg, WindowSize, init, subscriptions, update)
 
 import Browser.Events as Events
 import Browser.Navigation as Nav
@@ -30,11 +30,6 @@ type alias Model =
     , nbsimu : Int
     , windowSize : WindowSize
     }
-
-
-identity : Model -> Maybe String
-identity =
-    .identity
 
 
 flagsDecoder : Json.Decoder Flags
