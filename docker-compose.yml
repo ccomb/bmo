@@ -3,6 +3,7 @@ version: '3'
 services:
   ms:
     build: .
+    restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
     networks:
@@ -12,6 +13,7 @@ services:
       - mongodata:/data
   mongo:
     image: mongo:5
+    restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
