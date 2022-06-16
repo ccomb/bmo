@@ -7,3 +7,5 @@ elm-stuff/
 mongo.password
 node_modules
 build/
+.env
+__pycache__/

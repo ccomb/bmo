@@ -23,6 +23,7 @@ services:
 
 volumes:
   mongodata:
+    driver: anybox/buttervolume:latest
   tmp:
 
 networks:
