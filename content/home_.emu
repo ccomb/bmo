@@ -172,7 +172,7 @@ Nous aidons déjà des startups et des organisations internationales de toutes t
         |> TREE
             - [Anybox]{img|src=/public/anybox.png, width=200 , desc=Anybox }
             - [Innovation web]{ link | url=https://www.anybox.fr/comment-developper-un-produit-numerique}
-            - [IA, Machine Learning]{ link | url=https://www.anybox.fr/contactus?name=Machine%20Learning}
+            - [Solution DevOps]{ link | url=https://anyops.cloud/}
             - [DevOps]{ link | url=https://www.anybox.fr/devops}
             - [Cloud]{ link | url=https://www.anybox.fr/comment-migrer-vos-services-sur-le-cloud}
             - [Agilité]{link | url=https://www.anybox.fr/agilite}
