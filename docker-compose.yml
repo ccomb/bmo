@@ -2,7 +2,7 @@ version: '3'
 
 services:
   ms:
-    build: .
+    image: rg.fr-par.scw.cloud/anybox/ccomb/bmo:latest
     restart: unless-stopped
     environment:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}

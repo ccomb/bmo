@@ -1,0 +1,60 @@
+variables:
+  COMMIT_TAG: "$CI_COMMIT_REF_NAME-$CI_COMMIT_SHA-$CI_PIPELINE_ID"
+  COMMIT_HASH: "$CI_COMMIT_SHA"
+
+stages:
+- build
+- deploy
+- stop
+
+
+build:
+  stage: build
+  only:
+    - main
+  script:
+    - build.sh $SCW_SECRET_KEY $CI_PROJECT_PATH
+
+
+deploy_staging:
+  stage: deploy
+  only:
+    - main
+  environment:
+    name: staging
+    url: https://URL_STAGING
+    on_stop: stop_staging
+  script:
+    - deploy.sh staging $SCW_SECRET_KEY $CI_PROJECT_PATH
+  when: manual
+
+stop_staging:
+  stage: stop
+  environment:
+    name: staging
+    action: stop
+  script:
+    - docker compose -p staging-$(basename $CI_PROJECT_PATH) down -v
+  when: manual
+
+
+deploy_prod:
+  stage: deploy
+  only:
+    - main
+  environment:
+    name: prod
+    url: https://URL_PROD
+    on_stop: stop_prod
+  script:
+    - deploy.sh prod $SCW_SECRET_KEY $CI_PROJECT_PATH
+  when: manual
+
+stop_prod:
+  stage: stop
+  environment:
+    name: prod
+    action: stop
+  script:
+    - docker compose down
+  when: manual
