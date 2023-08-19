@@ -1,0 +1,50 @@
+variables:
+  IMAGE: "$CI_REGISTRY_IMAGE"
+  COMMIT_TAG: "$CI_COMMIT_REF_NAME-$CI_COMMIT_SHA-$CI_PIPELINE_ID"
+  COMMIT_HASH: "$CI_COMMIT_SHA"
+services:
+  - docker:20.10-dind
+
+stages:
+- build
+# - scan-secu
+#- pre-deploy
+- deploy
+  #- backups
+
+before_script:
+  - apk update && apk add git
+
+#############################
+#       BUILD
+#############################
+
+build:
+  stage: build
+  only:
+    - main
+  script:
+    - docker login
+    - docker pull $IMAGE:latest || true
+    # build
+    - docker build --cache-from $IMAGE:latest --push -t $IMAGE:latest .
+
+#############################
+#       DEPLOY
+#############################
+
+deploy:
+  stage: deploy
+  only:
+    - main
+  image: registry.anybox.cloud/infra/infra-cli:main
+  environment:
+    name: prod
+    url: https://$DNS_PROD
+  script:
+    # deploy
+    - docker pull "$CI_REGISTRY_IMAGE:latest"
+    - docker compose up -d
+  when: manual
+
+
