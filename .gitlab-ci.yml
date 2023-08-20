@@ -36,7 +36,7 @@ stop_staging:
     name: staging
     action: stop
   script:
-    - docker compose -p staging-$(basename $CI_PROJECT_PATH) down -v
+    - stop.sh staging $CI_PROJECT_PATH
   when: manual
 
 
@@ -50,7 +50,7 @@ deploy_prod:
     url: https://URL_PROD
     on_stop: stop_prod
   script:
-    - deploy.sh prod $SCW_SECRET_KEY $CI_PROJECT_PATH
+    - stop.sh prod $CI_PROJECT_PATH
   when: manual
 
 stop_prod:
