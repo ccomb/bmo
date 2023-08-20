@@ -22,7 +22,7 @@ deploy_staging:
     - main
   environment:
     name: staging
-    url: https://URL_STAGING
+    url: https://staging.URL_PROD
     on_stop: stop_staging
   script:
     - deploy.sh staging $SCW_SECRET_KEY $CI_PROJECT_PATH
