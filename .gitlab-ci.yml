@@ -50,7 +50,7 @@ deploy_prod:
     url: https://URL_PROD
     on_stop: stop_prod
   script:
-    - stop.sh prod $CI_PROJECT_PATH
+    - deploy.sh prod $SCW_SECRET_KEY $CI_PROJECT_PATH
   when: manual
 
 stop_prod:
@@ -59,5 +59,5 @@ stop_prod:
     name: prod
     action: stop
   script:
-    - docker compose down
+    - stop.sh prod $CI_PROJECT_PATH
   when: manual
