@@ -12,6 +12,7 @@ build:
   stage: build
   only:
     - main
+    - master
   script:
     - build.sh $SCW_SECRET_KEY $CI_PROJECT_PATH
 
@@ -20,6 +21,7 @@ deploy_staging:
   stage: deploy
   only:
     - main
+    - master
   environment:
     name: staging
     url: https://staging.URL_PROD
@@ -42,6 +44,7 @@ deploy_prod:
   stage: deploy
   only:
     - main
+    - master
   environment:
     name: prod
     url: https://URL_PROD
