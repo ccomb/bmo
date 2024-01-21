@@ -3,9 +3,9 @@
     image= /public/hero.jpg
     textColor = 100 100 100 90
     titleBackground = 0 0 0 60
-    tagline = Découvrez le chemin le plus court vers votre objectif de rentabilité.
+    tagline = Discover the shortest path to your profitability goal
     url = /app
-    text = Utilisez le Business Model Optimizer
+    text = Try the Business Model Optimizer.
     background = 20 50 20
     color = 90 90 90
     heightRatio = 0.5
@@ -13,156 +13,89 @@
 
 
 |> H1
-    Vous voulez améliorer votre rentabilité
-
-Votre entreprise fonctionne depuis plusieurs années. Vous avez stabilisé votre activité, mais vous avez atteint un plafond de verre, ou bien vous n'être simplement pas rentable.
-
-Que faire ?
-
-En tant que dirigeant, vous pouvez décider d'agir sur un ou plusieurs critères qui composent la structure de votre modèle économique. 
-
-Le problème est que vous ne savez pas exactement quoi faire. Quel paramètre de l'activité devez-vous modifier ?
-
-Quelques exemples possibles :
+    How to use this tool
 
 |> TREE
-    - Réduire les charges fixes. Mais lesquelles ?
-    - Augmenter les tarifs ? Mais de quel produit ? Et de combien de pourcents ?
-    - Changer de fournisseur et réduire les coûts des matières premières ?
+    - First describe your business model with a formula.
+    - The tool creates a fillable form for each variable in the formula.
+    - Choose your goal, and replace in the formula the goal variable with a numerical value.
 
-Ou bien faut-il tout améliorer à la fois, mais de combien ?
+|> H3
+    The simplest example is the following:
 
-Si votre activité est vraiment basique, vous savez déjà quoi faire. Ne perdez pas de temps, cet outil ne vous servira à rien.
+result = revenue - expenses
 
-Mais si vous avez plusieurs types et catalogues de produits, une structure de coût ou de revenus un peu complexe, alors vous êtes face à un nombre de choix possibles qui devient astronomique.  Laissez tomber vos intuitions, elles sont biaisées par vos croyances.
+You can enter this formula in the tool, each of the variable names must contain no space.
 
+[→ Try it!]{ cta | background=20 50 20, color=90 90 90, url=/app?formula=result%20%3D%20revenue%20-%20expenses}
 
-|> SECTION
-    padding = 50
-    backgroundColor = 20 50 20
-    color = 100 100 100 90
-    fontsize = 40
-    content =
-        *Cet outil d'optimisation va vous aider*.
-        Lisez la suite pour comprendre comment l'utiliser.
+Imagine you currently have 500k€ in products and 500k€ in charges. Your result is 0€.
+
+You want to earn 100k€. Replace `result` with 100000 in the formula.
+
+*the shortest path is to reduce your charges by about 10%, increase your revenues by 10%, and lower your result ambitions by 2%.* → The tool has calculated the shortest path to meet your formula.
 
 
 |> H2
-    Comment utiliser cet outil ?
+    Now your products
 
-Votre résultat annuel peut se calculer avec une formule de calcul. Comme celles que vous utilisez dans un tableur.
+Now you can break down your revenue. Imagine you are a retailer with two articles, and two different prices. And this time you decide that the profit goal is 100k€ non-negotiable!
 
-Voici l'exemple le plus simple :
+The formula can now look like:
 
-Résultat annuel = produits - charges
-
-C'est une formule simplissime avec trois variables :
+`price1 * NbSales1 + price2 * NbSales2 - expenses = 100000` [→ Try it!]{ cta | background=20 50 20, color=90 90 90, url=/app?formula=price1%20*%20NbSales1%20%2B%20price2%20*%20NbSales2%20-%20expenses%20%3D%20100000 } 
 
 |> TREE
-    - le résultat annuel
-    - les produits
-    - les charges
+    - Your Article 1 is worth 100€, you sell 3000 per year;
+    - Your Article 2 is worth 2000€, you sell 100 per year.
 
-Vous pouvez entrer cette formule dans l'outil, chacun des noms de variables ne doit contenir aucune espace. On va donc l'écrire : `resultat = produits - charges`. [→ Essayez]{ cta | background=20 50 20, color=90 90 90, url=/app?formula=resultat%20%3D%20produits%20-%20charges}.
+Enter these values in the tool, they correspond to your current situation. In a few seconds you get the following target values:
 
-Imaginons que vous ayez actuellement 500k€ de produits et 500k€ de charge. Et vous voudriez obtenir 100k€ de résultat. Vous rentrez ces trois valeurs dans l'outil, et le résultat tombe :
+|> TREE
+    - Increase sales of item 1 by 6%, also increase its price by 6%
+    - Increase sales of item 2 by 4%, also increase its price by 4%
+    - Lower your expenses by 9%
+    - *→ you get 100k€ in annual result*
 
-*le chemin le plus court est de baisser vos charges d'environ 10%, augmenter vos revenus de 10%, et baisser vos ambitions de résultat de 2%.* → L'outil a calculé le chemin le plus court pour satisfaire votre formule. 
+Here the tool determines that the effort must be 50% more important on item 1 than on item 2.
+This is totally normal since item 1 accounts for 60% of the turnover.
+These values are quite easy to obtain by hand, but you might have a doubt about which item to favor.
+This way you have an indication of the marketing efforts to be made and the pricing changes, which are not extraordinary because the effort is also proposed on the charges.
+It is easier to make a set of small changes.
+Another possible solution is to increase the price of item 1 by 33%, a solution that achieves the same result but risks dropping sales.
 
+You can do the same exercise by breaking down your charges.
 
 |> H2
-    Maintenant vos produits
+    What is your own formula?
 
-Maintenant vous pouvez décomposer vos revenus. Imaginons que vous êtes un commerçant avec deux articles, et deux prix différents.
-Et cette fois vous décidez que l'objectif de résultat est 100k€ non négociable !
+Your business model is surely much more complex than these trivial examples.
+You need to break down your charges, detail the structure of your revenue.
+Maybe you will find important and easy levers. Maybe you will realize that one of your products is useless and should be removed.
 
-La formule peut maintenant ressembler à :
-
-`prix1 * NbVentes1 + prix2 * NbVentes2 - charges = 100000` [→ Essayez]{ cta | background=20 50 20, color=90 90 90, url=/app?formula=prix1%20*%20NbVentes1%20%2B%20prix2%20*%20NbVentes2%20-%20charges%20%3D%20100000 } 
-
-|> TREE
-    - Votre Article 1 vaut 100€, vous en vendez 3000 par an ;
-    - Votre Article 2 vaut 2000€, vous en vendez 100 par an.
-
-Vous saisissez ces valeurs dans l'outil, elles correspondant à votre situation actuelle. En quelques secondes vous obtenez les valeurs cibles suivantes :
-
-|> TREE
-    - Augmenter les ventes de l'article 1 de 6%, augmentez son prix également de 6%
-    - Augmentez les ventes de l'article 2 de 4%, augmentez son prix également de 4%
-    - Baissez vos charges de 9%
-    - *→ vous obtenez 100k€ de résultat*
-
-Ici l'outil détermine que l'effort doit être 50% plus important sur l'article 1 que sur l'article 2. Ce qui est totalement normal puisque l'article 1 compte pour 60% du chiffre d'affaire.
-Ces valeurs sont assez faciles à obtenir à la main, mais vous pouvez avoir un doute sur l'article à favoriser.
-De cette façon vous avez une indication sur les efforts marketing à effectuer et les changements tarifaires, qui ne sont pas extraordinaire car l'effort est également proposé sur les charges.
-Il est plus facile de faire un ensemble de petites modifications.
-Une autre solution possible est d'augmenter le prix de l'article 1 de 33%, une solution qui permet d'arriver au même résultat, mais qui risque de faire chuter les ventes.
-
-Vous pouvez faire le même exercice, en décomposant vos charges.
-
-|> H2
-    Quelle est votre propre formule ?
-
-Votre modèle économique est sûrement beaucoup plus complexe que ces exemples triviaux. Vous devez redécouper vos charges, détailler la structure de vos revenus. Peut-être allez-vous trouver des leviers importants et faciles. Peut-être allez-vous réaliser que l'un de vos produits ne sert à rien et devrait être supprimé.
-
-C'est à vous de jouer !
+It's your turn to play!
 
 
 |> ctaBlock
     url = /app
-    text = Essayez maintenant !
+    text = Try now!
     background = 20 50 20
     color = 90 90 90
 
 |> H2
-    Aidez-nous, répondez aux questions :
+    Please help, answering those questions:
 
-Nous aimerions savoir ce que vous pensez de cet outil et comment le faire évoluer :
+I would like to know what you think of this tool and how to evolve it:
 
 |> iframe
     name=Typeform
-    button=→ Ouvrir le bref sondage ←
+    button=→ Open the quick survey ←
     color=90 90 90
     bcolor=20 20 50
     src=https://christophecombelles.typeform.com/to/iiLyAAYc
     width=640
     height=510
     background=100 100 100
-
-
-|> H2
-    Comment fonctionne cet outil ?
-
-Votre résultat annuel est un espace de dimension N !
-
-Ne prenez pas peur : une « dimension » est simplement une variable dans la formule de calcul de votre résultat annuel.
-Les valeurs que vous saisissez représentent votre situation actuelle.
-Cette situation actuelle peut donc être représentée par l'ensemble de ces N valeurs : c'est donc un point mathématique dans cet espace à N dimensions.
-La difficulté de l'exercice vient du fait que votre objectif de rentabilité n'est pas juste un autre point dans cet espace.
-En effet vous pouvez faire varier n'importe quelle variable pour tenter d'atteindre vos objectifs.
-Mais il n'est pas sûr que ça ait un effet.
-
-Par exemple si vous faites 150k€ de perte et que vous avez 100k€ de charges fixes, supprimer totalement les charges fixes ne permet pas d'atteindre votre objectif.
-Vous devez agir sur plusieurs variables. Donc votre rentabilité est en réalité une *surface* dans cet espace de dimension N !
-L'outil vous permet de calculer en quelques secondes le point situé sur la surface de rentabilité, qui est le plus proche de votre situation actuelle !
-Le calcul n'est pas trivial, il fait appel à un algorithme d'optimisation. Vous pouvez donc gagner du temps et optimiser vos chances de succès.
-
-Le résultat obtenu ne tient évidemment pas compte de votre contexte, c'est avant tout un résultat mathématique, qui tend à trouver un chemin qui provoque le moins de changement possible.
-C'est donc une aide à la décision : ça ne remplace pas votre propre analyse mais la complète.
-
-|> H2
-    Vous avez une innovation à développer ?
-
-[Contactez-nous]{link|url=https://www.anybox.fr/contactus?name=Innovation} !
-Anybox la concrétise et la déploie sur le Cloud, en suivant des pratiques [agiles]{link|url=https://www.anybox.fr/agilite} et [DevOps]{link|url=https://www.anybox.fr/devops}.
-Nous aidons déjà des startups et des organisations internationales de toutes tailles.
-
-|> ctaBlock
-    url = https://www.anybox.fr/contactus?name=Innovation
-    text = Prenez rendez-vous !
-    background = 20 50 20
-    color = 90 90 90
-
 
 
 |> Footer
