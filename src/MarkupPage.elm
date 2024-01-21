@@ -75,7 +75,7 @@ update msg model =
                     , Effect.none
                     )
 
-                Err error ->
+                Err _ ->
                     -- TODO
                     ( { model
                         | markup = Failed "Could not load the content"

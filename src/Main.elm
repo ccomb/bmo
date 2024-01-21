@@ -19,7 +19,7 @@ toDocument :
     Shared.Model
     -> View (Spa.Msg Shared.Msg pageMsg)
     -> Document (Spa.Msg Shared.Msg pageMsg)
-toDocument shared view =
+toDocument _ view =
     { title = view.title
     , body =
         [ E.layout view.attributes
