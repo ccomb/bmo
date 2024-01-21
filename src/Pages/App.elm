@@ -584,8 +584,8 @@ initialPoint model =
                 Maybe.withDefault 0 <| List.maximum <| List.map (\(Variable n _) -> String.length n) model.initialPoint
         in
         E.column blockAttributes <|
-            [ E.row [] [ E.text "Your current situation:" ] ]
-                ++ List.map2
+            E.row [] [ E.text "Your current situation:" ]
+                :: List.map2
                     (\(Variable vn vv) _ ->
                         E.wrappedRow [ E.spacing 50 ]
                             [ E.el [ Font.family [ Font.monospace ] ] (E.text <| String.padRight maxLabelSize ' ' vn)
@@ -711,8 +711,8 @@ nearestPoint model =
 
         else
             E.column blockAttributes <|
-                [ E.text "To achieve your goals you should:" ]
-                    ++ List.map2
+                E.text "To achieve your goals you should:"
+                    :: List.map2
                         (\iv tv ->
                             E.row []
                                 [ variation iv tv
