@@ -9,6 +9,7 @@ import Effect exposing (Effect)
 import Element as E
 import Element.Background as Background
 import Element.Border as Border
+import Element.Events as Events
 import Element.Font as Font
 import Element.Input as Input
 import Http
@@ -505,6 +506,17 @@ inputFormula model =
             , placeholder = placeholder model
             , label = Input.labelAbove [ Font.size 25 ] (E.text "Enter your formula:")
             }
+        , E.column [ E.width E.fill ]
+            [ E.text "Click on these examples:"
+            , E.link [ E.paddingXY 16 8, Font.bold, Events.onClick <| FormulaChanged "results = revenue - expenses" ]
+                { url = "/app?formula=result%20%3D%20revenue%20-%20expenses"
+                , label = E.text "→ results = revenue - expenses"
+                }
+            , E.link [ E.paddingXY 16 8, Font.bold, Events.onClick <| FormulaChanged "price1 * NbSales1 + price2 * NbSales2 - expenses = 100000" ]
+                { url = "/app?formula=price1%20*%20NbSales1%20%2B%20price2%20*%20NbSales2%20-%20expenses%20%3D%20100000"
+                , label = E.text "→ price1 * NbSales1 + price2 * NbSales2 - expenses = 100000"
+                }
+            ]
         ]
 
 
