@@ -18,7 +18,7 @@ import sympy
 
 api = FastAPI()
 api.mount("/public", StaticFiles(directory="../build"), name="public")
-templates = Jinja2Templates(directory="../public")
+templates = Jinja2Templates(directory="../build")
 
 MONGOPASSWORD = os.environ.get("MONGO_INITDB_ROOT_PASSWORD", "root")
 CLIENT = pymongo.MongoClient(
